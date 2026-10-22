@@ -179,7 +179,7 @@ export default function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (password === 'admin123') setIsLoggedIn(true);
+    if (password === 'suk@njksm2026') setIsLoggedIn(true);
     else alert('Kata laluan salah!');
   };
 
@@ -439,7 +439,7 @@ export default function App() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <input 
                   type="password" 
-                  placeholder="Masukkan Kata Laluan (admin123)" 
+                  placeholder="Masukkan Kata Laluan" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white"
