@@ -21,14 +21,14 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(API_URL, { redirect: "follow" });
       const data = await res.json();
 
       if (data.sukan && data.sukan.length > 1) {
         const formattedSukan = data.sukan.slice(1).map(row => ({ id: row[0], nama: row[1], kategori: row[2], status: row[3] }));
         setSukanList(formattedSukan);
-        if (formattedSukan.length > 0 && !selectedSukan) {
-          setSelectedSukan(formattedSukan[0].nama);
+        if (formattedSukan.length > 0) {
+          setSelectedSukan(prev => prev || formattedSukan[0].nama);
         }
       } else {
         setSukanList([]);
@@ -39,11 +39,6 @@ export default function App() {
           id: row[0], sukan: row[1], peringkat: row[2], pasukanA: row[3], pasukanB: row[4], skorA: Number(row[5] || 0), skorB: Number(row[6] || 0), pemenang: row[7]
         }));
         setJadualList(loadedJadual);
-
-        const defaultSukan = selectedSukan || (data.sukan[1] && data.sukan[1][1]) || '';
-        if (defaultSukan) {
-          populateFormWithExistingData(defaultSukan, 'Separuh Akhir 1', loadedJadual);
-        }
       } else {
         setJadualList([]);
       }
@@ -195,24 +190,35 @@ export default function App() {
       status: newSukan.status
     };
 
-    await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    setNewSukan({ id: '', nama: '', kategori: '', status: 'Belum Mula' });
-    setIsEditSukan(false);
-    await fetchData();
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Mencegah blokir CORS saat POST ke Google Script
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setNewSukan({ id: '', nama: '', kategori: '', status: 'Belum Mula' });
+      setIsEditSukan(false);
+      setTimeout(() => fetchData(), 1000); // Beri jeda 1 detik lalu refresh
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleDeleteSukan = async (id) => {
     if (!window.confirm("Adakah anda pasti nak padam sukan ini?")) return;
     setLoading(true);
-    await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'deleteSukan', id })
-    });
-    await fetchData();
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteSukan', id })
+      });
+      setTimeout(() => fetchData(), 1000);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleEditSukanClick = (sukan) => {
@@ -223,11 +229,17 @@ export default function App() {
   const handleAddJadual = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'updateSkor', id: 'M' + Date.now().toString().slice(-4), ...newJadual })
-    });
-    await fetchData();
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateSkor', id: 'M' + Date.now().toString().slice(-4), ...newJadual })
+      });
+      setTimeout(() => fetchData(), 1000);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Logik Bracket Awam
