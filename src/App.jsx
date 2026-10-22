@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Edit, Trash2, Award } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('public');
@@ -21,23 +21,39 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(API_URL, { redirect: "follow" });
+      // Direct Fetch ke Google Script URL
+      const res = await fetch(API_URL);
       const data = await res.json();
 
-      if (data.sukan && data.sukan.length > 1) {
-        const formattedSukan = data.sukan.slice(1).map(row => ({ id: row[0], nama: row[1], kategori: row[2], status: row[3] }));
+      if (data && data.sukan && data.sukan.length > 1) {
+        const formattedSukan = data.sukan.slice(1).map(row => ({ 
+          id: String(row[0] || ''), 
+          nama: String(row[1] || ''), 
+          kategori: String(row[2] || ''), 
+          status: String(row[3] || '') 
+        })).filter(s => s.nama.trim() !== '');
+
         setSukanList(formattedSukan);
         if (formattedSukan.length > 0) {
           setSelectedSukan(prev => prev || formattedSukan[0].nama);
+          setNewJadual(prev => ({ ...prev, sukan: prev.sukan || formattedSukan[0].nama }));
         }
       } else {
         setSukanList([]);
       }
 
-      if (data.jadual && data.jadual.length > 1) {
+      if (data && data.jadual && data.jadual.length > 1) {
         const loadedJadual = data.jadual.slice(1).map(row => ({
-          id: row[0], sukan: row[1], peringkat: row[2], pasukanA: row[3], pasukanB: row[4], skorA: Number(row[5] || 0), skorB: Number(row[6] || 0), pemenang: row[7]
-        }));
+          id: String(row[0] || ''), 
+          sukan: String(row[1] || ''), 
+          peringkat: String(row[2] || ''), 
+          pasukanA: String(row[3] || ''), 
+          pasukanB: String(row[4] || ''), 
+          skorA: Number(row[5] || 0), 
+          skorB: Number(row[6] || 0), 
+          pemenang: String(row[7] || '')
+        })).filter(j => j.sukan.trim() !== '');
+
         setJadualList(loadedJadual);
       } else {
         setJadualList([]);
@@ -57,20 +73,18 @@ export default function App() {
     const teams = {};
 
     const initTeam = (tName) => {
-      if (!tName || tName === 'TBD' || tName === 'Seri') return;
+      if (!tName || tName === 'TBD' || tName === 'Seri' || tName === '-') return;
       if (!teams[tName]) {
         teams[tName] = { pasukan: tName, emas: 0, perak: 0, gangsa: 0, mata: 0 };
       }
     };
 
-    // Ambil semua perlawanan Akhir dan Tempat Ke-3
     sukanList.forEach(s => {
       const sJadual = jadualList.filter(j => j.sukan === s.nama);
       const matchAkhir = sJadual.find(j => j.peringkat === 'Akhir');
       const matchT3 = sJadual.find(j => j.peringkat === 'Tempat Ke-3');
 
-      // Pengiraan Perlawanan Akhir (Emas & Perak)
-      if (matchAkhir && matchAkhir.pemenang && matchAkhir.pemenang !== 'Seri') {
+      if (matchAkhir && matchAkhir.pemenang && matchAkhir.pemenang !== 'Seri' && matchAkhir.pemenang !== '') {
         const johan = matchAkhir.pemenang;
         const naibJohan = matchAkhir.pemenang === matchAkhir.pasukanA ? matchAkhir.pasukanB : matchAkhir.pasukanA;
 
@@ -79,23 +93,20 @@ export default function App() {
 
         if (teams[johan]) {
           teams[johan].emas += 1;
-          teams[johan].mata += 5; // 5 mata untuk Emas
+          teams[johan].mata += 5;
         }
         if (teams[naibJohan]) {
           teams[naibJohan].perak += 1;
-          teams[naibJohan].mata += 3; // 3 mata untuk Perak
+          teams[naibJohan].mata += 3;
         }
       }
 
-      // Pengiraan Tempat Ke-3 (Gangsa)
-      if (matchT3 && matchT3.pemenang && matchT3.pemenang !== 'Seri') {
+      if (matchT3 && matchT3.pemenang && matchT3.pemenang !== 'Seri' && matchT3.pemenang !== '') {
         const tempat3 = matchT3.pemenang;
-
         initTeam(tempat3);
-
         if (teams[tempat3]) {
           teams[tempat3].gangsa += 1;
-          teams[tempat3].mata += 1; // 1 mata untuk Gangsa
+          teams[tempat3].mata += 1;
         }
       }
     });
@@ -105,7 +116,6 @@ export default function App() {
 
   const mataList = calculateLeaderboard();
 
-  // Helper untuk Form Admin
   const populateFormWithExistingData = (sukanTarget, peringkatTarget, currentJadual = jadualList) => {
     const matched = currentJadual.find(j => j.sukan === sukanTarget && j.peringkat === peringkatTarget);
     const sf1Match = currentJadual.find(j => j.sukan === sukanTarget && j.peringkat === 'Separuh Akhir 1');
@@ -193,15 +203,16 @@ export default function App() {
     try {
       await fetch(API_URL, {
         method: 'POST',
-        mode: 'no-cors', // Mencegah blokir CORS saat POST ke Google Script
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       });
       setNewSukan({ id: '', nama: '', kategori: '', status: 'Belum Mula' });
       setIsEditSukan(false);
-      setTimeout(() => fetchData(), 1000); // Beri jeda 1 detik lalu refresh
+      setTimeout(() => fetchData(), 1200);
     } catch (err) {
       console.error(err);
+      setLoading(false);
     }
   };
 
@@ -212,12 +223,13 @@ export default function App() {
       await fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'deleteSukan', id })
       });
-      setTimeout(() => fetchData(), 1000);
+      setTimeout(() => fetchData(), 1200);
     } catch (err) {
       console.error(err);
+      setLoading(false);
     }
   };
 
@@ -233,12 +245,13 @@ export default function App() {
       await fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateSkor', id: 'M' + Date.now().toString().slice(-4), ...newJadual })
       });
-      setTimeout(() => fetchData(), 1000);
+      setTimeout(() => fetchData(), 1200);
     } catch (err) {
       console.error(err);
+      setLoading(false);
     }
   };
 
@@ -264,7 +277,6 @@ export default function App() {
     skorA: 0, skorB: 0, pemenang: '' 
   };
 
-  // Cari Kedudukan Akhir Pemenang Acara Sukan
   const johanSukan = viewAkhir.pemenang && viewAkhir.pemenang !== 'Seri' ? viewAkhir.pemenang : '-';
   const naibJohanSukan = viewAkhir.pemenang && viewAkhir.pemenang !== 'Seri' ? (viewAkhir.pemenang === viewAkhir.pasukanA ? viewAkhir.pasukanB : viewAkhir.pasukanA) : '-';
   const tempatKe3Sukan = viewT3.pemenang && viewT3.pemenang !== 'Seri' ? viewT3.pemenang : '-';
