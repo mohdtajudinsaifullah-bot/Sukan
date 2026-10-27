@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Edit, Trash2, Award, UserPlus, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, UserCheck } from 'lucide-react';
+import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, UserPlus, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, UserCheck } from 'lucide-react';
 
 const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('public'); // 'public', 'undian', 'admin'
+  const [activeTab, setActiveTab] = useState('public');
   const [loading, setLoading] = useState(false);
   const [selectedSukan, setSelectedSukan] = useState('');
 
   // Sesi Pengguna Admin
-  const [currentUser, setCurrentUser] = useState(null); // { email, name, role, allowedSports }
+  const [currentUser, setCurrentUser] = useState(null);
   const [inputEmail, setInputEmail] = useState('');
   const [loginError, setLoginError] = useState('');
 
   // Data Senarai Utama
-  const [sukanList, setSukanList] = useState([]);
+  const [acaraList, setAcaraList] = useState([]);
   const [jadualList, setJadualList] = useState([]);
   const [bolingList, setBolingList] = useState([]);
   const [bolingIndividuList, setBolingIndividuList] = useState([]);
@@ -30,13 +30,9 @@ export default function App() {
   const [drawStatusLabel, setDrawStatusLabel] = useState('MENUNGGU CABUTAN BERMULA');
   const [isRolling, setIsRolling] = useState(false);
 
-  // Form State Admin Sukan & Skor
-  const [newSukan, setNewSukan] = useState({ id: '', nama: '', kategori: '', status: 'Belum Mula' });
-  const [isEditSukan, setIsEditSukan] = useState(false);
-  const [formatSukan, setFormatSukan] = useState('kalah_mati');
-  const [newJadual, setNewJadual] = useState({ sukan: '', peringkat: 'Separuh Akhir 1', pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' });
-
-  // Form Daftar Admin Baharu (Oleh Master Admin)
+  // Form State Tambah Acara & Skor
+  const [newAcara, setNewAcara] = useState({ nama: '', format: 'Kalah Mati', kumpulan: 2 });
+  const [newJadual, setNewJadual] = useState({ peringkat: 'Separuh Akhir 1', pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' });
   const [newAdmin, setNewAdmin] = useState({ email: '', name: '', role: 'SUKAN', allowedSports: '' });
 
   const [bolingPasukanRows, setBolingPasukanRows] = useState([
@@ -53,20 +49,23 @@ export default function App() {
       const res = await fetch(API_URL);
       const data = await res.json();
 
-      if (data && data.sukan && data.sukan.length > 1) {
-        const formattedSukan = data.sukan.slice(1).map(row => ({ 
-          id: String(row[0] || ''), nama: String(row[1] || ''), kategori: String(row[2] || ''), status: String(row[3] || '') 
-        })).filter(s => s.nama.trim() !== '');
-
-        setSukanList(formattedSukan);
-        if (formattedSukan.length > 0) {
-          const firstSport = formattedSukan[0].nama;
-          setSelectedSukan(prev => prev || firstSport);
-          setSelectedSportUndian(prev => prev || firstSport);
+      // 1. Tarik Tab Acara
+      if (data && Array.isArray(data.acara) && data.acara.length > 1) {
+        const formatted = data.acara.slice(1).map(row => ({
+          nama: String(row[0] || '').trim(),
+          format: String(row[1] || 'Kalah Mati').trim(),
+          kumpulan: Number(row[2]) || 2
+        })).filter(a => a.nama !== '');
+        
+        setAcaraList(formatted);
+        if (formatted.length > 0) {
+          setSelectedSukan(prev => prev || formatted[0].nama);
+          setSelectedSportUndian(prev => prev || formatted[0].nama);
         }
       }
 
-      if (data && data.jadual && data.jadual.length > 1) {
+      // 2. Tarik Tab Jadual
+      if (data && Array.isArray(data.jadual) && data.jadual.length > 1) {
         setJadualList(data.jadual.slice(1).map(row => ({
           id: String(row[0] || ''), sukan: String(row[1] || ''), peringkat: String(row[2] || ''), 
           pasukanA: String(row[3] || ''), pasukanB: String(row[4] || ''), skorA: Number(row[5] || 0), 
@@ -74,21 +73,24 @@ export default function App() {
         })).filter(j => j.sukan.trim() !== ''));
       }
 
-      if (data && data.boling && data.boling.length > 1) {
+      // 3. Tarik Tab Boling
+      if (data && Array.isArray(data.boling) && data.boling.length > 1) {
         setBolingList(data.boling.slice(1).map(row => ({
-          id: String(row[0] || ''), sukan: String(row[1] || ''), pasukan: String(row[2] || ''), jumlahPin: Number(row[3] || 0)
+          sukan: String(row[1] || ''), pasukan: String(row[2] || ''), jumlahPin: Number(row[3] || 0)
         })).filter(b => b.sukan.trim() !== ''));
       }
 
-      if (data && data.bolingIndividu && data.bolingIndividu.length > 1) {
+      // 4. Tarik Tab Boling Individu
+      if (data && Array.isArray(data.bolingIndividu) && data.bolingIndividu.length > 1) {
         setBolingIndividuList(data.bolingIndividu.slice(1).map(row => ({
-          id: String(row[0] || ''), sukan: String(row[1] || ''), namaPemain: String(row[2] || ''), pasukan: String(row[3] || ''), pinIndividu: Number(row[4] || 0)
+          sukan: String(row[1] || ''), namaPemain: String(row[2] || ''), pasukan: String(row[3] || ''), pinIndividu: Number(row[4] || 0)
         })).filter(bi => bi.sukan.trim() !== ''));
       }
 
-      if (data && data.undian && data.undian.length > 1) {
+      // 5. Tarik Tab Keputusan Undian
+      if (data && Array.isArray(data.keputusan) && data.keputusan.length > 1) {
         const newDraws = {};
-        data.undian.slice(1).forEach(row => {
+        data.keputusan.slice(1).forEach(row => {
           const sp = String(row[1] || '').trim();
           const gr = String(row[2] || '').trim();
           const tm = String(row[3] || '').trim();
@@ -101,7 +103,8 @@ export default function App() {
         setTournamentDraws(newDraws);
       }
 
-      if (data && data.admins && data.admins.length > 1) {
+      // 6. Tarik Tab Admin
+      if (data && Array.isArray(data.admins) && data.admins.length > 1) {
         setAdminList(data.admins.slice(1).map(row => ({
           email: String(row[0] || ''), name: String(row[1] || ''), role: String(row[2] || ''), allowedSports: String(row[3] || '')
         })));
@@ -120,13 +123,11 @@ export default function App() {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    if (selectedSukan.toLowerCase().includes('boling') || selectedSukan.toLowerCase().includes('bowling')) {
-      setFormatSukan('boling');
-    }
-  }, [selectedSukan]);
+  // Format bagi sukan semasa
+  const currentSportObj = acaraList.find(a => a.nama === selectedSukan) || { format: 'Kalah Mati' };
+  const isBolingFormat = currentSportObj.format.toLowerCase().includes('boling');
 
-  // Log In Semakan Emel
+  // Pengesahan Log Masuk
   const handleLoginByEmail = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -142,10 +143,10 @@ export default function App() {
         localStorage.setItem('jksm_user_session', JSON.stringify(data.user));
         setInputEmail('');
       } else {
-        setLoginError('Emel tidak dijumpai dalam rekod Helaian Admin! Sila hubungi Master Admin.');
+        setLoginError('Emel tidak dijumpai dalam rekod Helaian Admin!');
       }
     } catch (err) {
-      setLoginError('Ralat rangkaian semasa memeriksa emel.');
+      setLoginError('Ralat sambungan rangkaian ke Google Sheets.');
     }
     setLoading(false);
   };
@@ -155,46 +156,43 @@ export default function App() {
     localStorage.removeItem('jksm_user_session');
   };
 
-  // Penapisan Sukan Mengikut Kelayakan Admin Sukan
-  const getAllowedSportsList = () => {
+  // Tapis Acara untuk Admin
+  const getAllowedSports = () => {
     if (!currentUser) return [];
-    if (currentUser.role === 'MASTER') return sukanList;
+    if (currentUser.role === 'MASTER') return acaraList;
     if (currentUser.role === 'SUKAN') {
-      const allowed = currentUser.allowedSports.split(',').map(s => s.trim().toLowerCase());
-      return sukanList.filter(s => allowed.includes(s.nama.toLowerCase()) || allowed.includes('semua'));
+      const allowed = (currentUser.allowedSports || '').split(',').map(s => s.trim().toLowerCase());
+      return acaraList.filter(a => allowed.includes(a.nama.toLowerCase()) || allowed.includes('semua'));
     }
     return [];
   };
 
-  const allowedSportsForAdmin = getAllowedSportsList();
+  const allowedSports = getAllowedSports();
 
-  // Kemaskini Dropdown jika admin sukan tiada akses pada sukan semasa
   useEffect(() => {
-    if (currentUser && currentUser.role === 'SUKAN' && allowedSportsForAdmin.length > 0) {
-      if (!allowedSportsForAdmin.some(s => s.nama === selectedSukan)) {
-        setSelectedSukan(allowedSportsForAdmin[0].nama);
+    if (currentUser && currentUser.role === 'SUKAN' && allowedSports.length > 0) {
+      if (!allowedSports.some(a => a.nama === selectedSukan)) {
+        setSelectedSukan(allowedSports[0].nama);
       }
     }
-  }, [currentUser, allowedSportsForAdmin]);
+  }, [currentUser, allowedSports]);
 
-  // Logik Skor & Pemenang
-  const calculateWinner = (sAVal, sBVal, pA, pB) => {
-    const sA = Number(sAVal);
-    const sB = Number(sBVal);
-    if (sA > sB && pA) return pA;
-    if (sB > sA && pB) return pB;
-    if (sA === sB && (sA > 0 || sB > 0)) return 'Seri';
+  // Pengiraan Pemenang
+  const calculateWinner = (sA, sB, pA, pB) => {
+    const a = Number(sA);
+    const b = Number(sB);
+    if (a > b && pA) return pA;
+    if (b > a && pB) return pB;
+    if (a === b && (a > 0 || b > 0)) return 'Seri';
     return '';
   };
 
-  const handleSkorChange = (skorAVal, skorBVal) => {
-    const sA = Number(skorAVal);
-    const sB = Number(skorBVal);
+  const handleSkorChange = (sA, sB) => {
     const win = calculateWinner(sA, sB, newJadual.pasukanA, newJadual.pasukanB);
-    setNewJadual(prev => ({ ...prev, skorA: sA, skorB: sB, pemenang: win }));
+    setNewJadual(prev => ({ ...prev, skorA: Number(sA), skorB: Number(sB), pemenang: win }));
   };
 
-  // Carta Pungutan Pingat
+  // Pengiraan Pungutan Pingat
   const calculateLeaderboard = () => {
     const leaderTeams = {};
     const initTeam = (tName) => {
@@ -202,8 +200,8 @@ export default function App() {
       if (!leaderTeams[tName]) leaderTeams[tName] = { pasukan: tName, emas: 0, perak: 0, gangsa: 0, mata: 0 };
     };
 
-    sukanList.forEach(s => {
-      if (s.nama.toLowerCase().includes('boling') || s.nama.toLowerCase().includes('bowling')) {
+    acaraList.forEach(s => {
+      if (s.format.toLowerCase().includes('boling')) {
         const bRows = bolingList.filter(b => b.sukan === s.nama).sort((a, b) => b.jumlahPin - a.jumlahPin);
         if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 5; }
         if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 3; }
@@ -227,11 +225,37 @@ export default function App() {
       }
     });
 
-    return Object.values(leaderTeams).sort((a, b) => b.mata - a.mata || b.emas - a.emas || b.perak - a.perak);
+    return Object.values(leaderTeams).sort((a, b) => b.mata - a.mata || b.emas - a.emas);
   };
   const mataList = calculateLeaderboard();
 
-  // Handler Hantar Data Skor
+  // Pengurusan Sukan / Acara
+  const handleAddAcara = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await fetch(API_URL, {
+        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'addAcara', ...newAcara })
+      });
+      setNewAcara({ nama: '', format: 'Kalah Mati', kumpulan: 2 });
+      setTimeout(fetchData, 1200);
+    } catch (err) { console.error(err); setLoading(false); }
+  };
+
+  const handleDeleteAcara = async (nama) => {
+    if (!window.confirm(`Adakah anda pasti mahu memadam acara ${nama}?`)) return;
+    setLoading(true);
+    try {
+      await fetch(API_URL, {
+        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'deleteAcara', nama })
+      });
+      setTimeout(fetchData, 1200);
+    } catch (err) { console.error(err); setLoading(false); }
+  };
+
+  // Kemas Kini Skor
   const handleAddJadual = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -240,60 +264,29 @@ export default function App() {
         method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateSkor', id: 'M' + Date.now().toString().slice(-4), ...newJadual, sukan: selectedSukan })
       });
-      setTimeout(() => fetchData(), 1200);
+      setTimeout(fetchData, 1200);
     } catch (err) { console.error(err); setLoading(false); }
   };
 
-  const handleSaveBolingSeparate = async (e) => {
+  const handleSaveBoling = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       await fetch(API_URL, {
         method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          action: 'updateBolingSeparate',
-          sukan: selectedSukan,
-          pasukanList: bolingPasukanRows,
-          individuList: bolingIndividuRows
-        })
+        body: JSON.stringify({ action: 'updateBolingSeparate', sukan: selectedSukan, pasukanList: bolingPasukanRows, individuList: bolingIndividuRows })
       });
-      setTimeout(() => fetchData(), 1200);
+      setTimeout(fetchData, 1200);
     } catch (err) { console.error(err); setLoading(false); }
   };
 
-  // Handler Master Admin Mengurus Admin Lain
-  const handleSaveNewAdmin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await fetch(API_URL, {
-        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'saveAdminUser', ...newAdmin })
-      });
-      setNewAdmin({ email: '', name: '', role: 'SUKAN', allowedSports: '' });
-      setTimeout(() => fetchData(), 1200);
-    } catch (err) { console.error(err); setLoading(false); }
-  };
-
-  const handleDeleteAdmin = async (email) => {
-    if (!window.confirm(`Adakah anda pasti mahu memadam admin ${email}?`)) return;
-    setLoading(true);
-    try {
-      await fetch(API_URL, {
-        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'deleteAdminUser', email: email })
-      });
-      setTimeout(() => fetchData(), 1200);
-    } catch (err) { console.error(err); setLoading(false); }
-  };
-
-  // Kebenaran Cabutan Undian
+  // Cabutan Undian
   const canManageUndian = currentUser && (currentUser.role === 'MASTER' || currentUser.role === 'UNDIAN');
 
   const mulakanCabutan = () => {
-    if (!canManageUndian) return alert("Hanya Master Admin atau Admin Pengundian yang dibenarkan menjalankan cabutan.");
-    if (!selectedSportUndian) return alert("Sila pilih sukan terlebih dahulu!");
-    if (teams.length < 2) return alert("Sila masukkan sekurang-kurangnya 2 pasukan!");
+    if (!canManageUndian) return alert("Hanya Urusetia Pengundian / Master Admin dibenarkan membuat undian.");
+    if (!selectedSportUndian) return alert("Pilih sukan dahulu!");
+    if (teams.length < 2) return alert("Masukkan sekurang-kurangnya 2 pasukan!");
 
     const groupNames = [];
     for (let i = 0; i < groupCountUndian; i++) {
@@ -307,11 +300,11 @@ export default function App() {
     groupNames.forEach(g => drawnTeams.push(...currentSportDraws[g]));
     const remainingTeams = teams.filter(t => !drawnTeams.includes(t));
 
-    if (remainingTeams.length === 0) return alert(`Semua pasukan telah selesai diundi bagi sukan ${selectedSportUndian}!`);
+    if (remainingTeams.length === 0) return alert(`Semua pasukan telah diundi bagi ${selectedSportUndian}!`);
 
     const maxPerGroup = Math.ceil(teams.length / groupCountUndian);
     const availableGroups = groupNames.filter(g => currentSportDraws[g].length < maxPerGroup);
-    if (availableGroups.length === 0) return alert(`Semua kumpulan bagi sukan ${selectedSportUndian} telah penuh!`);
+    if (availableGroups.length === 0) return alert("Semua kumpulan telah penuh!");
 
     availableGroups.sort((a, b) => currentSportDraws[a].length - currentSportDraws[b].length);
     const targetGroup = availableGroups[0];
@@ -333,15 +326,15 @@ export default function App() {
       
       setTournamentDraws(updatedAll);
       setDrawDisplay(`🎯 ${chosen}`);
-      setDrawStatusLabel(`BERJAYA DIMASUKKAN KE ${targetGroup.toUpperCase()}!`);
+      setDrawStatusLabel(`MASUK KE ${targetGroup.toUpperCase()}!`);
       
-      // Simpan ke Google Sheets
       const sportResults = [];
       Object.keys(updatedSportDraws).forEach(grp => {
         updatedSportDraws[grp].forEach(team => {
           sportResults.push({ sport: selectedSportUndian, group: grp, team: team });
         });
       });
+
       await fetch(API_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "saveSportResults", sportName: selectedSportUndian, results: sportResults })
@@ -353,7 +346,7 @@ export default function App() {
   const viewJadual = jadualList.filter(j => j.sukan === selectedSukan);
   const viewSF1 = viewJadual.find(j => j.peringkat === 'Separuh Akhir 1') || { pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' };
   const viewSF2 = viewJadual.find(j => j.peringkat === 'Separuh Akhir 2') || { pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' };
-  const getLoser = (match) => (!match.pemenang || match.pemenang === 'Seri') ? '' : (match.pemenang === match.pasukanA ? match.pasukanB : match.pasukanA);
+  const getLoser = (m) => (!m.pemenang || m.pemenang === 'Seri') ? '' : (m.pemenang === m.pasukanA ? m.pasukanB : m.pasukanA);
   const viewAkhir = viewJadual.find(j => j.peringkat === 'Akhir') || { pasukanA: viewSF1.pemenang || '', pasukanB: viewSF2.pemenang || '', skorA: 0, skorB: 0, pemenang: '' };
   const viewT3 = viewJadual.find(j => j.peringkat === 'Tempat Ke-3') || { pasukanA: getLoser(viewSF1) || '', pasukanB: getLoser(viewSF2) || '', skorA: 0, skorB: 0, pemenang: '' };
 
@@ -432,23 +425,22 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Paparan Bracket / Boling */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl space-y-6 backdrop-blur-md">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h2 className="text-xl font-bold text-blue-400">
-                    {formatSukan === 'boling' ? '🎳 KEDUDUKAN & CARTA JATUHAN PIN BOLING' : '⚽ CARTA PERLAWANAN (KALAH MATI)'}
+                    {isBolingFormat ? '🎳 KEDUDUKAN JATUHAN PIN BOLING' : '⚽ CARTA PERLAWANAN'}
                   </h2>
-                  {sukanList.length > 0 && (
+                  {acaraList.length > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-slate-300">Pilih Acara:</span>
                       <select value={selectedSukan} onChange={(e) => setSelectedSukan(e.target.value)} className="bg-slate-950/80 border border-slate-700/80 p-2 rounded-lg text-white font-bold">
-                        {sukanList.map((s, i) => <option key={i} value={s.nama}>{s.nama}</option>)}
+                        {acaraList.map((s, i) => <option key={i} value={s.nama}>{s.nama}</option>)}
                       </select>
                     </div>
                   )}
                 </div>
 
-                {formatSukan === 'boling' ? (
+                {isBolingFormat ? (
                   <div className="space-y-6">
                     <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/80">
                       <h3 className="text-md font-bold text-yellow-400 mb-4 uppercase">Kategori Berpasukan ({selectedSukan})</h3>
@@ -464,42 +456,15 @@ export default function App() {
                           </thead>
                           <tbody>
                             {currentBolingList.map((b, idx) => (
-                              <tr key={idx} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                              <tr key={idx} className="border-b border-slate-800/60">
                                 <td className="p-3 font-bold text-slate-300">#{idx + 1}</td>
                                 <td className="p-3 font-semibold">{b.pasukan}</td>
                                 <td className="p-3 text-right font-black text-amber-400 text-lg">{b.jumlahPin} Pin</td>
                                 <td className="p-3 text-center">
-                                  {idx === 0 && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold">🥇 JOHAN (EMAS)</span>}
-                                  {idx === 1 && <span className="bg-slate-400/20 text-slate-300 border border-slate-400/40 px-3 py-1 rounded-full text-xs font-bold">🥈 NAIB JOHAN (PERAK)</span>}
-                                  {idx === 2 && <span className="bg-amber-600/20 text-amber-500 border border-amber-600/40 px-3 py-1 rounded-full text-xs font-bold">🥉 TEMPAT KE-3 (GANGSA)</span>}
-                                  {idx > 2 && <span className="text-slate-500 text-xs font-semibold">Tempat Ke-{idx + 1}</span>}
+                                  {idx === 0 && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold">🥇 EMAS</span>}
+                                  {idx === 1 && <span className="bg-slate-400/20 text-slate-300 border border-slate-400/40 px-3 py-1 rounded-full text-xs font-bold">🥈 PERAK</span>}
+                                  {idx === 2 && <span className="bg-amber-600/20 text-amber-500 border border-amber-600/40 px-3 py-1 rounded-full text-xs font-bold">🥉 GANGSA</span>}
                                 </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/80">
-                      <h3 className="text-md font-bold text-emerald-400 mb-4 uppercase">Kategori Individu / High Game ({selectedSukan})</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className="border-b border-slate-700 text-slate-400 text-sm">
-                              <th className="p-3">Kedudukan</th>
-                              <th className="p-3">Nama Pemain</th>
-                              <th className="p-3">Pasukan</th>
-                              <th className="p-3 text-right">Skor Pin Individu</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {currentIndividuList.map((bi, idx) => (
-                              <tr key={idx} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-                                <td className="p-3 font-bold text-slate-300">#{idx + 1}</td>
-                                <td className="p-3 font-bold text-white">{bi.namaPemain}</td>
-                                <td className="p-3 text-slate-400">{bi.pasukan || '-'}</td>
-                                <td className="p-3 text-right font-black text-emerald-400 text-lg">{bi.pinIndividu} Pin</td>
                               </tr>
                             ))}
                           </tbody>
@@ -554,12 +519,12 @@ export default function App() {
                     <h2 className="text-lg md:text-xl font-black text-amber-400 flex items-center gap-2">
                       <Dices className="text-amber-300" /> Pentas Cabutan Undian Langsung
                     </h2>
-                    <p className="text-xs text-slate-300">Pancaran cabutan rasmi untuk tontonan atlet & kontinjen.</p>
+                    <p className="text-xs text-slate-300">Pancaran cabutan rasmi kumpulan.</p>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <select value={selectedSportUndian} onChange={(e) => setSelectedSportUndian(e.target.value)} className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 font-bold">
-                      {sukanList.map((s, i) => <option key={i} value={s.nama}>{s.nama}</option>)}
+                      {acaraList.map((s, i) => <option key={i} value={s.nama}>{s.nama}</option>)}
                     </select>
                     <select value={groupCountUndian} onChange={(e) => setGroupCountUndian(Number(e.target.value))} className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-amber-400 font-bold">
                       <option value="1">1 Kumpulan (Liga)</option>
@@ -572,7 +537,7 @@ export default function App() {
 
                 <div className={`bg-slate-950/90 border rounded-2xl p-6 text-center my-4 transition shadow-2xl ${isRolling ? 'border-amber-400 scale-[1.02]' : 'border-slate-800'}`}>
                   <div className="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">{drawStatusLabel}</div>
-                  <div className="text-3xl md:text-5xl font-black text-emerald-400 py-3 tracking-wide drop-shadow-md">{drawDisplay}</div>
+                  <div className="text-3xl md:text-5xl font-black text-emerald-400 py-3 tracking-wide">{drawDisplay}</div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -583,53 +548,45 @@ export default function App() {
                     <Printer className="w-4 h-4" /> Cetak / Simpan PDF
                   </button>
                 </div>
-
-                {!canManageUndian && (
-                  <p className="text-center mt-3 text-xs text-amber-400/90 italic">
-                    ℹ️ Mod Atlet / Tontonan: Hanya Master Admin atau Admin Pengundian boleh memulakan cabutan.
-                  </p>
-                )}
               </section>
 
-              {/* Grid Keputusan Undian */}
+              {/* Senarai Keputusan Undian Tab Keputusan */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
                 <h3 className="text-lg font-bold text-white mb-4">Keputusan Rasmi Undian Kumpulan</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sukanList.map((s, idx) => {
+                  {acaraList.map((s, idx) => {
                     const spDraws = tournamentDraws[s.nama] || {};
                     const groupKeys = Object.keys(spDraws);
 
                     return (
-                      <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10 flex flex-col justify-between">
-                        <div>
-                          <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
-                            <span>🏆 {s.nama}</span>
-                            <span className="text-[10px] text-slate-300 font-semibold">{s.kategori}</span>
-                          </div>
-
-                          {groupKeys.length === 0 ? (
-                            <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
-                              Belum dibuat undian
-                            </div>
-                          ) : (
-                            groupKeys.map((grpName, gIdx) => (
-                              <div key={gIdx} className="mb-3 last:mb-0">
-                                <div className="text-[11px] font-bold text-amber-300/90 mb-1 flex items-center justify-between">
-                                  <span>{grpName}</span>
-                                  <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
-                                </div>
-                                <ul className="space-y-1">
-                                  {spDraws[grpName].map((tm, tIdx) => (
-                                    <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white font-medium">
-                                      <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
-                                      <span>{tm}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))
-                          )}
+                      <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10">
+                        <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
+                          <span>🏆 {s.nama}</span>
+                          <span className="text-[10px] text-slate-300">{s.format}</span>
                         </div>
+
+                        {groupKeys.length === 0 ? (
+                          <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
+                            Belum dibuat undian
+                          </div>
+                        ) : (
+                          groupKeys.map((grpName, gIdx) => (
+                            <div key={gIdx} className="mb-3 last:mb-0">
+                              <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
+                                <span>{grpName}</span>
+                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
+                              </div>
+                              <ul className="space-y-1">
+                                {spDraws[grpName].map((tm, tIdx) => (
+                                  <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white">
+                                    <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
+                                    <span>{tm}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))
+                        )}
                       </div>
                     );
                   })}
@@ -638,14 +595,13 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: ADMIN PORTAL BERPERANAN (ROLE-BASED) */}
+          {/* TAB 3: ADMIN PORTAL */}
           {activeTab === 'admin' && (
             !currentUser ? (
-              /* LOG MASUK BERASASKAN EMEL */
               <div className="max-w-md mx-auto bg-slate-900/70 p-8 rounded-xl border border-slate-700/60 text-center shadow-2xl backdrop-blur-md">
                 <Lock className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-2">Log Masuk Pegawai / Admin</h2>
-                <p className="text-xs text-slate-400 mb-4">Sila masukkan emel rasmi anda yang telah didaftarkan.</p>
+                <h2 className="text-xl font-bold mb-2">Log Masuk Pegawai</h2>
+                <p className="text-xs text-slate-400 mb-4">Masukkan emel berdaftar dalam helaian Admin.</p>
                 
                 <form onSubmit={handleLoginByEmail} className="space-y-4">
                   <input 
@@ -654,25 +610,16 @@ export default function App() {
                     value={inputEmail} 
                     onChange={(e) => setInputEmail(e.target.value)} 
                     required
-                    className="w-full p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-white focus:outline-none focus:border-emerald-500" 
+                    className="w-full p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-white" 
                   />
-                  
-                  {loginError && (
-                    <div className="p-2 text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg">
-                      {loginError}
-                    </div>
-                  )}
-
+                  {loginError && <div className="p-2 text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg">{loginError}</div>}
                   <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold">
-                    {loading ? 'Menyemak Emel...' : 'Log Masuk'}
+                    {loading ? 'Menyemak...' : 'Log Masuk'}
                   </button>
                 </form>
               </div>
             ) : (
-              /* PANEL ADMIN APABILA SUDAH LOG MASUK */
               <div className="space-y-6">
-                
-                {/* Bar Profil & Status Peranan Admin */}
                 <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 flex flex-wrap justify-between items-center gap-3">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-500/30">
@@ -681,114 +628,42 @@ export default function App() {
                     <div>
                       <h3 className="font-bold text-white text-base">{currentUser.name} ({currentUser.email})</h3>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          currentUser.role === 'MASTER' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
-                          currentUser.role === 'UNDIAN' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' :
-                          'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        }`}>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
                           PERANAN: {currentUser.role}
                         </span>
                         {currentUser.role === 'SUKAN' && (
-                          <span className="text-[11px] text-slate-300">
-                            Acara Dibenarkan: <strong>{currentUser.allowedSports}</strong>
-                          </span>
+                          <span className="text-[11px] text-slate-300">Dibenarkan: <strong>{currentUser.allowedSports}</strong></span>
                         )}
                       </div>
                     </div>
                   </div>
-
-                  <button onClick={handleLogout} className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                  <button onClick={handleLogout} className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg text-xs font-bold">
                     <LogOut className="w-3.5 h-3.5" /> Keluar
                   </button>
                 </div>
 
-                {/* 1. KHAS UNTUK MASTER ADMIN: PENGURUSAN ADMIN LAIN */}
-                {currentUser.role === 'MASTER' && (
-                  <div className="bg-slate-900/60 p-6 rounded-xl border border-amber-500/40 space-y-4 backdrop-blur-md">
-                    <h3 className="text-lg font-bold flex items-center gap-2 text-amber-400">
-                      <UserCheck className="w-5 h-5" /> Pengurusan Pegawai & Hak Akses Admin (Master Admin Sahaja)
-                    </h3>
-                    
-                    <form onSubmit={handleSaveNewAdmin} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                      <input 
-                        type="email" 
-                        placeholder="Emel Pegawai (cth: ali@jksm.gov.my)" 
-                        value={newAdmin.email} 
-                        onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})} 
-                        required 
-                        className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs" 
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Nama Pegawai" 
-                        value={newAdmin.name} 
-                        onChange={(e) => setNewAdmin({...newAdmin, name: e.target.value})} 
-                        required 
-                        className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs" 
-                      />
-                      <select 
-                        value={newAdmin.role} 
-                        onChange={(e) => setNewAdmin({...newAdmin, role: e.target.value})} 
-                        className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-amber-400 font-bold"
-                      >
-                        <option value="SUKAN">Admin Sukan (Kemas Kini Skor)</option>
-                        <option value="UNDIAN">Admin Pengundian (Urus Undian)</option>
-                        <option value="MASTER">Master Admin (Semua Akses)</option>
-                      </select>
-                      <input 
-                        type="text" 
-                        placeholder="Acara Dibenarkan (cth: Futsal, Boling L)" 
-                        value={newAdmin.allowedSports} 
-                        onChange={(e) => setNewAdmin({...newAdmin, allowedSports: e.target.value})} 
-                        className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs" 
-                      />
-                      <button type="submit" disabled={loading} className="md:col-span-4 bg-amber-600 hover:bg-amber-500 font-bold p-2.5 rounded-lg text-xs">
-                        Daftar Pegawai / Admin Baharu
-                      </button>
-                    </form>
-
-                    <div className="border-t border-slate-800 pt-3">
-                      <h4 className="text-xs font-bold text-slate-300 mb-2">Senarai Pegawai Berdaftar:</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {adminList.map((a, i) => (
-                          <div key={i} className="p-2.5 bg-slate-950/80 rounded-lg border border-slate-800 flex justify-between items-center text-xs">
-                            <div>
-                              <p className="font-bold text-white">{a.name} <span className="text-[10px] text-amber-400">({a.role})</span></p>
-                              <p className="text-[11px] text-slate-400">{a.email}</p>
-                              {a.role === 'SUKAN' && <p className="text-[10px] text-slate-400 italic">Acara: {a.allowedSports || 'Tiada'}</p>}
-                            </div>
-                            {a.role !== 'MASTER' && (
-                              <button onClick={() => handleDeleteAdmin(a.email)} className="text-rose-400 hover:text-rose-300 p-1">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. KHAS MASTER ADMIN: PENGURUSAN ACARA SUKAN */}
+                {/* KHAS MASTER ADMIN: PENGURUSAN ACARA SUKAN */}
                 {currentUser.role === 'MASTER' && (
                   <div className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 space-y-4 backdrop-blur-md">
-                    <h3 className="text-lg font-bold flex items-center gap-2"><Plus className="text-emerald-400" /> Tambah / Edit Acara Sukan</h3>
-                    <form onSubmit={handleAddSukan} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input type="text" placeholder="Nama Sukan (cth: Futsal / Boling L)" value={newSukan.nama} onChange={(e) => setNewSukan({...newSukan, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
-                      <input type="text" placeholder="Kategori (cth: Lelaki / Terbuka)" value={newSukan.kategori} onChange={(e) => setNewSukan({...newSukan, kategori: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
-                      <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg text-sm">{isEditSukan ? 'Kemaskini Sukan' : 'Simpan Sukan'}</button>
+                    <h3 className="text-lg font-bold flex items-center gap-2"><Plus className="text-emerald-400" /> Daftar Acara Sukan (Tab Acara)</h3>
+                    <form onSubmit={handleAddAcara} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <input type="text" placeholder="Nama Sukan (cth: Futsal)" value={newAcara.nama} onChange={(e) => setNewAcara({...newAcara, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
+                      <select value={newAcara.format} onChange={(e) => setNewAcara({...newAcara, format: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm text-amber-400 font-bold">
+                        <option value="Kalah Mati">Kalah Mati (Bracket)</option>
+                        <option value="Liga">Liga Kumpulan</option>
+                        <option value="Boling">Boling (Pin)</option>
+                      </select>
+                      <input type="number" placeholder="Bil Kumpulan" value={newAcara.kumpulan} onChange={(e) => setNewAcara({...newAcara, kumpulan: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
+                      <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg text-sm">Simpan Acara</button>
                     </form>
 
                     <div className="mt-4 border-t border-slate-700/60 pt-4">
-                      <h4 className="text-sm font-bold text-slate-300 mb-2">Senarai Sukan:</h4>
+                      <h4 className="text-sm font-bold text-slate-300 mb-2">Senarai Acara Sedia Ada:</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {sukanList.map((s) => (
-                          <div key={s.id} className="bg-slate-950/60 p-3 rounded-lg border border-slate-700/60 flex justify-between items-center">
-                            <div><p className="font-bold text-white text-sm">{s.nama}</p><p className="text-xs text-slate-300">{s.kategori}</p></div>
-                            <div className="flex gap-2">
-                              <button onClick={() => { setNewSukan(s); setIsEditSukan(true); }} className="p-2 bg-blue-600/40 text-blue-300 rounded-lg"><Edit className="w-4 h-4" /></button>
-                              <button onClick={() => handleDeleteSukan(s.id)} className="p-2 bg-rose-600/40 text-rose-300 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                            </div>
+                        {acaraList.map((s, i) => (
+                          <div key={i} className="bg-slate-950/60 p-3 rounded-lg border border-slate-700/60 flex justify-between items-center">
+                            <div><p className="font-bold text-white text-sm">{s.nama}</p><p className="text-xs text-slate-300">{s.format} ({s.kumpulan} Kumpulan)</p></div>
+                            <button onClick={() => handleDeleteAcara(s.nama)} className="p-2 bg-rose-600/40 text-rose-300 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         ))}
                       </div>
@@ -796,85 +671,42 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 3. KEMAS KINI SKOR (DITAPIS MENGIKUT ACARA DIBENARKAN) */}
+                {/* KEMASKINI SKOR */}
                 {(currentUser.role === 'MASTER' || currentUser.role === 'SUKAN') && (
                   <div className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 space-y-4 backdrop-blur-md">
                     <h3 className="text-lg font-bold flex items-center gap-2 text-yellow-400">
-                      <Plus className="text-emerald-400" /> Kemaskini Skor Acara Sukan
+                      <Plus className="text-emerald-400" /> Kemaskini Skor Acara
                     </h3>
 
-                    {allowedSportsForAdmin.length === 0 ? (
+                    {allowedSports.length === 0 ? (
                       <div className="p-4 bg-slate-950/80 rounded-lg border border-slate-800 text-center text-sm text-slate-400">
-                        Tiada acara sukan diberikan kepada emel anda. Sila hubungi Master Admin untuk mendapatkan hak akses.
+                        Tiada sukan diberikan kepada emel anda.
                       </div>
                     ) : (
                       <div className="p-4 bg-slate-950/80 rounded-lg border border-slate-800 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Acara Sukan (Ditapis mengikut kebenaran)</label>
-                            <select value={selectedSukan} onChange={(e) => setSelectedSukan(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold">
-                              {allowedSportsForAdmin.map((s, i) => <option key={i} value={s.nama}>{s.nama}</option>)}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Format Pertandingan</label>
-                            <select value={formatSukan} onChange={(e) => setFormatSukan(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-amber-400 font-bold">
-                              <option value="kalah_mati">Format Kalah Mati (Bracket)</option>
-                              <option value="boling">Format Boling (Leaderboard Pin)</option>
-                            </select>
-                          </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Pilih Acara Sukan</label>
+                          <select value={selectedSukan} onChange={(e) => setSelectedSukan(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold">
+                            {allowedSports.map((s, i) => <option key={i} value={s.nama}>{s.nama} ({s.format})</option>)}
+                          </select>
                         </div>
 
-                        {formatSukan === 'boling' ? (
-                          <form onSubmit={handleSaveBolingSeparate} className="space-y-6 border-t border-slate-800 pt-4">
-                            <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                              <div className="flex justify-between items-center">
-                                <h4 className="text-sm font-bold text-yellow-400 uppercase">1. Senarai Pasukan & Skor ({selectedSukan})</h4>
-                                <button type="button" onClick={() => setBolingPasukanRows([...bolingPasukanRows, { pasukan: '', jumlahPin: 0 }])} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                  <Plus className="w-3.5 h-3.5" /> Tambah Pasukan
-                                </button>
+                        {isBolingFormat ? (
+                          <form onSubmit={handleSaveBoling} className="space-y-4 border-t border-slate-800 pt-4">
+                            <h4 className="text-sm font-bold text-yellow-400 uppercase">Pungutan Pin Pasukan ({selectedSukan})</h4>
+                            {bolingPasukanRows.map((row, index) => (
+                              <div key={index} className="flex items-center gap-3">
+                                <input type="text" placeholder="Pasukan" value={row.pasukan} onChange={(e) => { const cp = [...bolingPasukanRows]; cp[index].pasukan = e.target.value; setBolingPasukanRows(cp); }} className="w-2/3 p-2 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
+                                <input type="number" placeholder="Pin" value={row.jumlahPin} onChange={(e) => { const cp = [...bolingPasukanRows]; cp[index].jumlahPin = Number(e.target.value); setBolingPasukanRows(cp); }} className="w-1/3 p-2 bg-slate-900 border border-slate-700 rounded-lg font-bold text-yellow-400 text-sm" />
                               </div>
-                              {bolingPasukanRows.map((row, index) => (
-                                <div key={index} className="p-3 bg-slate-950 rounded-lg border border-slate-700/80 flex items-center gap-3">
-                                  <span className="text-xs font-bold text-slate-400 w-6">#{index + 1}</span>
-                                  <input type="text" placeholder="Nama Pasukan" value={row.pasukan} onChange={(e) => { const copy = [...bolingPasukanRows]; copy[index].pasukan = e.target.value; setBolingPasukanRows(copy); }} required className="w-2/3 p-2 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                  <input type="number" placeholder="Pin" value={row.jumlahPin} onChange={(e) => { const copy = [...bolingPasukanRows]; copy[index].jumlahPin = Number(e.target.value); setBolingPasukanRows(copy); }} required className="w-1/3 p-2 bg-slate-900 border border-slate-700 rounded-lg font-bold text-yellow-400 text-sm" />
-                                  {bolingPasukanRows.length > 1 && (
-                                    <button type="button" onClick={() => setBolingPasukanRows(bolingPasukanRows.filter((_, i) => i !== index))} className="text-rose-400"><Trash2 className="w-4 h-4" /></button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                              <div className="flex justify-between items-center">
-                                <h4 className="text-sm font-bold text-emerald-400 uppercase">2. Senarai Pemain Individu ({selectedSukan})</h4>
-                                <button type="button" onClick={() => setBolingIndividuRows([...bolingIndividuRows, { namaPemain: '', pasukan: '', pinIndividu: 0 }])} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                  <UserPlus className="w-3.5 h-3.5" /> Tambah Pemain
-                                </button>
-                              </div>
-                              {bolingIndividuRows.map((row, index) => (
-                                <div key={index} className="p-3 bg-slate-950 rounded-lg border border-slate-700/80 grid grid-cols-1 md:grid-cols-3 gap-2">
-                                  <input type="text" placeholder="Nama Pemain" value={row.namaPemain} onChange={(e) => { const copy = [...bolingIndividuRows]; copy[index].namaPemain = e.target.value; setBolingIndividuRows(copy); }} className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                  <input type="text" placeholder="Pasukan" value={row.pasukan} onChange={(e) => { const copy = [...bolingIndividuRows]; copy[index].pasukan = e.target.value; setBolingIndividuRows(copy); }} className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                  <div className="flex gap-2 items-center">
-                                    <input type="number" placeholder="Pin" value={row.pinIndividu} onChange={(e) => { const copy = [...bolingIndividuRows]; copy[index].pinIndividu = Number(e.target.value); setBolingIndividuRows(copy); }} className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg font-bold text-emerald-400 text-sm" />
-                                    {bolingIndividuRows.length > 1 && (
-                                      <button type="button" onClick={() => setBolingIndividuRows(bolingIndividuRows.filter((_, i) => i !== index))} className="text-rose-400"><Trash2 className="w-4 h-4" /></button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg shadow-lg">Simpan Skor Boling</button>
+                            ))}
+                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg">Simpan Skor Boling</button>
                           </form>
                         ) : (
                           <form onSubmit={handleAddJadual} className="space-y-4 border-t border-slate-800 pt-4">
                             <div>
-                              <label className="block text-xs font-semibold text-slate-400 mb-1">Peringkat / Pusingan</label>
-                              <select value={newJadual.peringkat} onChange={(e) => setNewJadual({...newJadual, peringkat: e.target.value})} required className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm">
+                              <label className="block text-xs font-semibold text-slate-400 mb-1">Peringkat</label>
+                              <select value={newJadual.peringkat} onChange={(e) => setNewJadual({...newJadual, peringkat: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm">
                                 <option value="Separuh Akhir 1">Separuh Akhir 1</option>
                                 <option value="Separuh Akhir 2">Separuh Akhir 2</option>
                                 <option value="Akhir">Akhir (Johan / Naib Johan)</option>
@@ -882,22 +714,17 @@ export default function App() {
                               </select>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                              <div className="md:col-span-2 space-y-3">
-                                <div className="flex gap-2 items-center">
-                                  <input type="text" placeholder="Pasukan A" value={newJadual.pasukanA} onChange={(e) => { const val = e.target.value; setNewJadual(prev => ({ ...prev, pasukanA: val, pemenang: calculateWinner(prev.skorA, prev.skorB, val, prev.pasukanB) })); }} required className="w-3/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                  <input type="number" value={newJadual.skorA} onChange={(e) => handleSkorChange(e.target.value, newJadual.skorB)} className="w-1/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center font-bold text-sm" />
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                  <input type="text" placeholder="Pasukan B" value={newJadual.pasukanB} onChange={(e) => { const val = e.target.value; setNewJadual(prev => ({ ...prev, pasukanB: val, pemenang: calculateWinner(prev.skorA, prev.skorB, prev.pasukanA, val) })); }} required className="w-3/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                  <input type="number" value={newJadual.skorB} onChange={(e) => handleSkorChange(newJadual.skorA, e.target.value)} className="w-1/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center font-bold text-sm" />
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="flex gap-2">
+                                <input type="text" placeholder="Pasukan A" value={newJadual.pasukanA} onChange={(e) => { const v = e.target.value; setNewJadual(p => ({ ...p, pasukanA: v, pemenang: calculateWinner(p.skorA, p.skorB, v, p.pasukanB) })); }} className="w-3/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
+                                <input type="number" value={newJadual.skorA} onChange={(e) => handleSkorChange(e.target.value, newJadual.skorB)} className="w-1/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center font-bold text-sm" />
                               </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-emerald-400 mb-1">Pemenang Automatik</label>
-                                <div className="p-7 bg-slate-950 border border-emerald-500/50 rounded-lg text-emerald-400 font-bold text-center text-sm">{newJadual.pemenang || 'Auto skor'}</div>
+                              <div className="flex gap-2">
+                                <input type="text" placeholder="Pasukan B" value={newJadual.pasukanB} onChange={(e) => { const v = e.target.value; setNewJadual(p => ({ ...p, pasukanB: v, pemenang: calculateWinner(p.skorA, p.skorB, p.pasukanA, v) })); }} className="w-3/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
+                                <input type="number" value={newJadual.skorB} onChange={(e) => handleSkorChange(newJadual.skorA, e.target.value)} className="w-1/4 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center font-bold text-sm" />
                               </div>
                             </div>
+                            <div className="p-3 bg-slate-950 border border-emerald-500/50 rounded-lg text-emerald-400 font-bold text-center text-sm">Pemenang: {newJadual.pemenang || '-'}</div>
 
                             <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg">Kemaskini Perlawanan</button>
                           </form>
