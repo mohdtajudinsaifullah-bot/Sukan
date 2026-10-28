@@ -121,8 +121,13 @@ export default function App() {
     fetchData();
   }, []);
 
-  const currentSportObj = acaraList.find(a => a.nama === selectedSukan) || { format: 'Kalah Mati' };
-  const isLeaderboardFormat = currentSportObj.format.toLowerCase().includes('boling') || currentSportObj.format.toLowerCase().includes('liga');
+  const currentSportObj = acaraList.find(a => a.nama.toLowerCase() === selectedSukan.toLowerCase()) || { format: 'Kalah Mati' };
+  const isLeaderboardFormat = currentSportObj.format.toLowerCase().includes('boling') || 
+                              currentSportObj.format.toLowerCase().includes('liga') ||
+                              selectedSukan.toLowerCase().includes('menembak') ||
+                              selectedSukan.toLowerCase().includes('golf') ||
+                              selectedSukan.toLowerCase().includes('memanah') ||
+                              selectedSukan.toLowerCase().includes('bowling');
 
   useEffect(() => {
     const sp = acaraList.find(a => a.nama === selectedSportUndian);
@@ -164,26 +169,23 @@ export default function App() {
     if (!selectedSukan) return;
 
     if (isLeaderboardFormat) {
-      const existingBoling = bolingList.filter(b => b.sukan === selectedSukan);
-      if (existingBoling.length > 0) {
-        setBolingPasukanRows(existingBoling.map(b => ({ pasukan: b.pasukan, jumlahPin: b.jumlahPin })));
-      } else {
-        const drawn = tournamentDraws[selectedSukan] || {};
-        const allTeams = [];
-        Object.keys(drawn).forEach(grp => {
-          drawn[grp].forEach(t => { if (!allTeams.includes(t)) allTeams.push(t); });
-        });
+      const existingBoling = bolingList.filter(b => b.sukan.toLowerCase() === selectedSukan.toLowerCase());
+      const drawn = tournamentDraws[selectedSukan] || {};
+      const allDrawnTeams = [];
+      Object.keys(drawn).forEach(grp => {
+        drawn[grp].forEach(t => { if (!allDrawnTeams.includes(t)) allDrawnTeams.push(t); });
+      });
 
-        if (allTeams.length > 0) {
-          setBolingPasukanRows(allTeams.map(t => ({ pasukan: t, jumlahPin: 0 })));
-        } else {
-          setBolingPasukanRows(teams.map(t => ({ pasukan: t, jumlahPin: 0 })));
-        }
-      }
+      const baseTeams = allDrawnTeams.length > 0 ? allDrawnTeams : teams;
+      const combined = baseTeams.map(t => {
+        const found = existingBoling.find(b => b.pasukan.toLowerCase() === t.toLowerCase());
+        return { pasukan: t, jumlahPin: found ? found.jumlahPin : 0 };
+      });
+      setBolingPasukanRows(combined);
       return;
     }
 
-    const matched = jadualList.find(j => j.sukan === selectedSukan && j.peringkat === newJadual.peringkat);
+    const matched = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === newJadual.peringkat);
     if (matched) {
       setNewJadual(prev => ({
         ...prev,
@@ -208,13 +210,13 @@ export default function App() {
         pA = kumpB[0] || (teams[2] || 'Pasukan 3');
         pB = kumpB[1] || (teams[3] || 'Pasukan 4');
       } else if (newJadual.peringkat === 'Akhir') {
-        const sf1 = jadualList.find(j => j.sukan === selectedSukan && j.peringkat === 'Separuh Akhir 1');
-        const sf2 = jadualList.find(j => j.sukan === selectedSukan && j.peringkat === 'Separuh Akhir 2');
+        const sf1 = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === 'Separuh Akhir 1');
+        const sf2 = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === 'Separuh Akhir 2');
         pA = sf1?.pemenang || '';
         pB = sf2?.pemenang || '';
       } else if (newJadual.peringkat === 'Tempat Ke-3') {
-        const sf1 = jadualList.find(j => j.sukan === selectedSukan && j.peringkat === 'Separuh Akhir 1');
-        const sf2 = jadualList.find(j => j.sukan === selectedSukan && j.peringkat === 'Separuh Akhir 2');
+        const sf1 = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === 'Separuh Akhir 1');
+        const sf2 = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === 'Separuh Akhir 2');
         const getLoser = (m) => (!m?.pemenang || m?.pemenang === 'Seri') ? '' : (m.pemenang === m.pasukanA ? m.pasukanB : m.pasukanA);
         pA = getLoser(sf1);
         pB = getLoser(sf2);
@@ -294,13 +296,15 @@ export default function App() {
     };
 
     acaraList.forEach(s => {
-      if (s.format.toLowerCase().includes('boling') || s.format.toLowerCase().includes('liga')) {
-        const bRows = bolingList.filter(b => b.sukan === s.nama).sort((a, b) => b.jumlahPin - a.jumlahPin);
+      const sFormat = s.format.toLowerCase();
+      const sNama = s.nama.toLowerCase();
+      if (sFormat.includes('boling') || sFormat.includes('liga') || sNama.includes('menembak') || sNama.includes('golf') || sNama.includes('memanah')) {
+        const bRows = bolingList.filter(b => b.sukan.toLowerCase() === s.nama.toLowerCase()).sort((a, b) => b.jumlahPin - a.jumlahPin);
         if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 5; }
         if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 3; }
         if (bRows[2] && bRows[2].jumlahPin > 0) { initTeam(bRows[2].pasukan); leaderTeams[bRows[2].pasukan].gangsa += 1; leaderTeams[bRows[2].pasukan].mata += 1; }
       } else {
-        const sJadual = jadualList.filter(j => j.sukan === s.nama);
+        const sJadual = jadualList.filter(j => j.sukan.toLowerCase() === s.nama.toLowerCase());
         const matchAkhir = sJadual.find(j => j.peringkat === 'Akhir');
         const matchT3 = sJadual.find(j => j.peringkat === 'Tempat Ke-3');
         if (matchAkhir && matchAkhir.pemenang && matchAkhir.pemenang !== 'Seri') {
@@ -488,11 +492,10 @@ export default function App() {
   const kumpA_view = sportDrawForView["Kumpulan A"] || sportDrawForView["Liga Kumpulan"] || [];
   const kumpB_view = sportDrawForView["Kumpulan B"] || [];
 
-  const viewJadual = jadualList.filter(j => j.sukan === selectedSukan);
+  const viewJadual = jadualList.filter(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase());
   const sf1Match = viewJadual.find(j => j.peringkat === 'Separuh Akhir 1');
   const sf2Match = viewJadual.find(j => j.peringkat === 'Separuh Akhir 2');
 
-  // Separuh Akhir 1 (Medan 1): Auto isi nama dari Kumpulan A jika admin belum kemaskini
   const viewSF1 = {
     pasukanA: sf1Match?.pasukanA || kumpA_view[0] || '-',
     pasukanB: sf1Match?.pasukanB || kumpA_view[1] || '-',
@@ -501,7 +504,6 @@ export default function App() {
     pemenang: sf1Match?.pemenang || ''
   };
 
-  // Separuh Akhir 2 (Medan 2): Auto isi nama dari Kumpulan B jika admin belum kemaskini
   const viewSF2 = {
     pasukanA: sf2Match?.pasukanA || kumpB_view[0] || '-',
     pasukanB: sf2Match?.pasukanB || kumpB_view[1] || '-',
@@ -530,7 +532,34 @@ export default function App() {
     pemenang: t3Match?.pemenang || ''
   };
 
-  const currentBolingList = bolingList.filter(b => b.sukan === selectedSukan).sort((a, b) => b.jumlahPin - a.jumlahPin);
+  // LOGIK MENJANA KEDUDUKAN MATA PASUKAN:
+  // Gabungkan senarai pasukan daripada undian dan skor daripada pangkalan data
+  const getLeaderboardTableData = () => {
+    const existingScores = bolingList.filter(b => b.sukan.toLowerCase() === selectedSukan.toLowerCase());
+    
+    // Ambil pasukan yang telah diundi
+    const drawn = tournamentDraws[selectedSukan] || {};
+    const drawnTeamsList = [];
+    Object.keys(drawn).forEach(grp => {
+      drawn[grp].forEach(t => { if (!drawnTeamsList.includes(t)) drawnTeamsList.push(t); });
+    });
+
+    const activeList = drawnTeamsList.length > 0 ? drawnTeamsList : teams;
+
+    const listWithScores = activeList.map(teamName => {
+      const match = existingScores.find(s => s.pasukan.toLowerCase() === teamName.toLowerCase());
+      return {
+        pasukan: teamName,
+        jumlahPin: match ? match.jumlahPin : 0
+      };
+    });
+
+    // Susun mengikut jumlah skor/mata tertinggi
+    listWithScores.sort((a, b) => b.jumlahPin - a.jumlahPin);
+    return listWithScores;
+  };
+
+  const currentBolingList = getLeaderboardTableData();
 
   return (
     <div className="min-h-screen text-white font-sans relative overflow-x-hidden">
@@ -637,20 +666,31 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {currentBolingList.map((b, idx) => (
-                            <tr key={idx} className="border-b border-slate-800/60">
+                          {currentBolingList.length > 0 ? currentBolingList.map((b, idx) => (
+                            <tr key={idx} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                               <td className="p-3 font-bold text-slate-300">#{idx + 1}</td>
                               <td className="p-3 font-semibold">{b.pasukan}</td>
                               <td className="p-3 text-right font-black text-amber-400 text-lg">
                                 {b.jumlahPin} {selectedSukan.toLowerCase().includes('boling') || selectedSukan.toLowerCase().includes('bowling') ? 'Pin' : 'Mata'}
                               </td>
                               <td className="p-3 text-center">
-                                {idx === 0 && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold">🥇 EMAS</span>}
-                                {idx === 1 && <span className="bg-slate-400/20 text-slate-300 border border-slate-400/40 px-3 py-1 rounded-full text-xs font-bold">🥈 PERAK</span>}
-                                {idx === 2 && <span className="bg-amber-600/20 text-amber-500 border border-amber-600/40 px-3 py-1 rounded-full text-xs font-bold">🥉 GANGSA</span>}
+                                {b.jumlahPin > 0 ? (
+                                  <>
+                                    {idx === 0 && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold">🥇 EMAS</span>}
+                                    {idx === 1 && <span className="bg-slate-400/20 text-slate-300 border border-slate-400/40 px-3 py-1 rounded-full text-xs font-bold">🥈 PERAK</span>}
+                                    {idx === 2 && <span className="bg-amber-600/20 text-amber-500 border border-amber-600/40 px-3 py-1 rounded-full text-xs font-bold">🥉 GANGSA</span>}
+                                    {idx > 2 && <span className="text-slate-500 text-xs font-semibold">Tempat Ke-{idx + 1}</span>}
+                                  </>
+                                ) : (
+                                  <span className="text-slate-500 text-xs font-semibold">Belum Mula</span>
+                                )}
                               </td>
                             </tr>
-                          ))}
+                          )) : (
+                            <tr>
+                              <td colSpan="4" className="text-center p-4 text-slate-500">Belum ada pasukan diundi atau didaftarkan.</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -663,7 +703,7 @@ export default function App() {
                       <div className="space-y-8">
                         <h3 className="text-center font-black text-slate-300 tracking-wider">SEPARUH AKHIR</h3>
                         
-                        {/* MEDAN 1: AUTO DARI KUMPULAN A (CTH: MERAH VS HIJAU) */}
+                        {/* MEDAN 1: AUTO DARI KUMPULAN A */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
                           <div className="flex justify-between items-center">
                             <span className={`font-bold ${viewSF1.pemenang && viewSF1.pemenang === viewSF1.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
@@ -679,7 +719,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* MEDAN 2: AUTO DARI KUMPULAN B (CTH: KUNING VS BIRU) */}
+                        {/* MEDAN 2: AUTO DARI KUMPULAN B */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
                           <div className="flex justify-between items-center">
                             <span className={`font-bold ${viewSF2.pemenang && viewSF2.pemenang === viewSF2.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
@@ -948,7 +988,8 @@ export default function App() {
                       <input type="text" placeholder="Nama Sukan (cth: Futsal)" value={newAcara.nama} onChange={(e) => setNewAcara({...newAcara, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <select value={newAcara.format} onChange={(e) => setNewAcara({...newAcara, format: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm text-amber-400 font-bold">
                         <option value="Kalah Mati">Kalah Mati (Bracket)</option>
-                        <option value="Boling">Boling (Mata Pasukan / Pin)</option>
+                        <option value="Liga">Liga Kumpulan</option>
+                        <option value="Boling">Boling / Mata Pasukan</option>
                       </select>
                       <input type="number" placeholder="Bil Kumpulan" value={newAcara.kumpulan} onChange={(e) => setNewAcara({...newAcara, kumpulan: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg text-sm">Simpan Acara</button>
