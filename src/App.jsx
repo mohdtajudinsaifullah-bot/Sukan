@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, UserPlus, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
+import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
 
 const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
@@ -61,7 +61,7 @@ export default function App() {
         }
       }
 
-      // 2. Tarik Tab Pasukan Dari Google Sheets
+      // 2. Tarik Tab Pasukan
       if (data && Array.isArray(data.pasukan) && data.pasukan.length > 1) {
         const loadedTeams = data.pasukan.slice(1).map(row => String(row[0] || '').trim()).filter(t => t !== '');
         if (loadedTeams.length > 0) {
@@ -78,7 +78,7 @@ export default function App() {
         })).filter(j => j.sukan.trim() !== ''));
       }
 
-      // 4. Tarik Tab Boling
+      // 4. Tarik Tab Boling / Skor Pasukan
       if (data && Array.isArray(data.boling) && data.boling.length > 1) {
         setBolingList(data.boling.slice(1).map(row => ({
           sukan: String(row[1] || ''), pasukan: String(row[2] || ''), jumlahPin: Number(row[3] || 0)
@@ -122,9 +122,8 @@ export default function App() {
   }, []);
 
   const currentSportObj = acaraList.find(a => a.nama === selectedSukan) || { format: 'Kalah Mati' };
-  const isBolingFormat = currentSportObj.format.toLowerCase().includes('boling');
+  const isLeaderboardFormat = currentSportObj.format.toLowerCase().includes('boling') || currentSportObj.format.toLowerCase().includes('liga');
 
-  // Auto-set Bilangan Kumpulan mengikut Acara di Pentas Undian
   useEffect(() => {
     const sp = acaraList.find(a => a.nama === selectedSportUndian);
     if (sp && sp.kumpulan) {
@@ -132,7 +131,6 @@ export default function App() {
     }
   }, [selectedSportUndian, acaraList]);
 
-  // FUNGSI PENGURUSAN PASUKAN & SIMPAN KE GOOGLE SHEETS
   const simpanPasukanKeSheets = async (updatedTeams) => {
     try {
       await fetch(API_URL, {
@@ -161,11 +159,11 @@ export default function App() {
     await simpanPasukanKeSheets(updated);
   };
 
-  // AUTO-POPULATE BORANG SKOR DARI HASIL UNDIAN
+  // Auto-populate skor dari hasil undian
   useEffect(() => {
     if (!selectedSukan) return;
 
-    if (isBolingFormat) {
+    if (isLeaderboardFormat) {
       const existingBoling = bolingList.filter(b => b.sukan === selectedSukan);
       if (existingBoling.length > 0) {
         setBolingPasukanRows(existingBoling.map(b => ({ pasukan: b.pasukan, jumlahPin: b.jumlahPin })));
@@ -231,9 +229,8 @@ export default function App() {
         pemenang: ''
       }));
     }
-  }, [selectedSukan, newJadual.peringkat, tournamentDraws, jadualList, isBolingFormat, bolingList, teams]);
+  }, [selectedSukan, newJadual.peringkat, tournamentDraws, jadualList, isLeaderboardFormat, bolingList, teams]);
 
-  // Log Masuk Emel
   const handleLoginByEmail = async (e) => {
     e.preventDefault();
     setLoginError('');
@@ -297,7 +294,7 @@ export default function App() {
     };
 
     acaraList.forEach(s => {
-      if (s.format.toLowerCase().includes('boling')) {
+      if (s.format.toLowerCase().includes('boling') || s.format.toLowerCase().includes('liga')) {
         const bRows = bolingList.filter(b => b.sukan === s.nama).sort((a, b) => b.jumlahPin - a.jumlahPin);
         if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 5; }
         if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 3; }
@@ -376,7 +373,7 @@ export default function App() {
     } catch (err) { console.error(err); setLoading(false); }
   };
 
-  // KEBENARAN URUSETIA PENGUNDIAN
+  // Cabutan Undian
   const canManageUndian = currentUser && (currentUser.role === 'MASTER' || currentUser.role === 'UNDIAN');
 
   const mulakanCabutan = () => {
@@ -438,7 +435,6 @@ export default function App() {
     }, 1800);
   };
 
-  // BUTANG: UNDI SUKAN INI TERUS (SEKALIGUS SEPERTI IMAGE 1)
   const undiSemuaSekaligus = async () => {
     if (!canManageUndian) return alert("Hanya Urusetia Pengundian / Master Admin dibenarkan membuat undian.");
     if (!selectedSportUndian) return alert("Pilih sukan dahulu!");
@@ -497,6 +493,50 @@ export default function App() {
 
   const currentBolingList = bolingList.filter(b => b.sukan === selectedSukan).sort((a, b) => b.jumlahPin - a.jumlahPin);
 
+  // Komponen Reusable untuk Grid Keputusan Undian Kumpulan (Digunakan pada Tab Keputusan & Tab Undian)
+  const renderUndianKumpulanGrid = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {acaraList.map((s, idx) => {
+        const spDraws = tournamentDraws[s.nama] || {};
+        const groupKeys = Object.keys(spDraws);
+
+        return (
+          <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
+                <span>🏆 {s.nama}</span>
+                <span className="text-[10px] text-slate-300 font-semibold">{s.format}</span>
+              </div>
+
+              {groupKeys.length === 0 ? (
+                <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
+                  Belum dibuat undian
+                </div>
+              ) : (
+                groupKeys.map((grpName, gIdx) => (
+                  <div key={gIdx} className="mb-3 last:mb-0">
+                    <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
+                      <span>{grpName}</span>
+                      <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
+                    </div>
+                    <ul className="space-y-1">
+                      {spDraws[grpName].map((tm, tIdx) => (
+                        <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white font-medium">
+                          <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
+                          <span>{tm}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="min-h-screen text-white font-sans relative overflow-x-hidden">
       <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/bg-sukan.png')" }} />
@@ -535,6 +575,7 @@ export default function App() {
           {/* TAB 1: KEPUTUSAN */}
           {activeTab === 'public' && (
             <>
+              {/* Carta Pungutan Pingat */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-yellow-400">
                   <Medal /> CARTA PUNGUTAN PINGAT & MATA TERKINI
@@ -569,10 +610,11 @@ export default function App() {
                 </div>
               </section>
 
+              {/* Perlawanan / Kedudukan Mata Pasukan (Label & Ikon Baru) */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl space-y-6 backdrop-blur-md">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <h2 className="text-xl font-bold text-blue-400">
-                    {isBolingFormat ? '🎳 KEDUDUKAN JATUHAN PIN BOLING' : '⚽ CARTA PERLAWANAN'}
+                  <h2 className="text-xl font-bold text-blue-400 tracking-wide uppercase">
+                    {isLeaderboardFormat ? 'KEDUDUKAN MATA PASUKAN' : '⚽ CARTA PERLAWANAN'}
                   </h2>
                   {acaraList.length > 0 && (
                     <div className="flex items-center gap-2">
@@ -584,7 +626,7 @@ export default function App() {
                   )}
                 </div>
 
-                {isBolingFormat ? (
+                {isLeaderboardFormat ? (
                   <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/80">
                     <h3 className="text-md font-bold text-yellow-400 mb-4 uppercase">Kategori Berpasukan ({selectedSukan})</h3>
                     <div className="overflow-x-auto">
@@ -593,7 +635,9 @@ export default function App() {
                           <tr className="border-b border-slate-700 text-slate-400 text-sm">
                             <th className="p-3">Rank</th>
                             <th className="p-3">Pasukan</th>
-                            <th className="p-3 text-right">Jumlah Jatuhan Pin</th>
+                            <th className="p-3 text-right">
+                              {selectedSukan.toLowerCase().includes('boling') || selectedSukan.toLowerCase().includes('bowling') ? 'Jumlah Jatuhan Pin' : 'Jumlah Mata / Skor'}
+                            </th>
                             <th className="p-3 text-center">Status Pingat</th>
                           </tr>
                         </thead>
@@ -602,7 +646,9 @@ export default function App() {
                             <tr key={idx} className="border-b border-slate-800/60">
                               <td className="p-3 font-bold text-slate-300">#{idx + 1}</td>
                               <td className="p-3 font-semibold">{b.pasukan}</td>
-                              <td className="p-3 text-right font-black text-amber-400 text-lg">{b.jumlahPin} Pin</td>
+                              <td className="p-3 text-right font-black text-amber-400 text-lg">
+                                {b.jumlahPin} {selectedSukan.toLowerCase().includes('boling') || selectedSukan.toLowerCase().includes('bowling') ? 'Pin' : 'Mata'}
+                              </td>
                               <td className="p-3 text-center">
                                 {idx === 0 && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold">🥇 EMAS</span>}
                                 {idx === 1 && <span className="bg-slate-400/20 text-slate-300 border border-slate-400/40 px-3 py-1 rounded-full text-xs font-bold">🥈 PERAK</span>}
@@ -649,14 +695,31 @@ export default function App() {
                   </div>
                 )}
               </section>
+
+              {/* PAPARAN KEPUTUSAN UNDIAN DI TAB KEPUTUSAN (SUSUNAN SAMA DENGAN IMAGE 1) */}
+              <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-white uppercase tracking-wide">
+                      Keputusan Rasmi Undian Kumpulan
+                    </h3>
+                    <p className="text-xs text-slate-400">Susunan kumpulan dan pasukan bagi setiap acara sukan.</p>
+                  </div>
+                  <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 flex items-center gap-1.5">
+                    <Printer className="w-4 h-4" /> Cetak / PDF
+                  </button>
+                </div>
+
+                {renderUndianKumpulanGrid()}
+              </section>
             </>
           )}
 
-          {/* TAB 2: PENTAS UNDIAN (TERMASUK PANEL SENARAI PASUKAN SEPERTI IMAGE 1) */}
+          {/* TAB 2: PENTAS UNDIAN */}
           {activeTab === 'undian' && (
             <div className="space-y-6">
 
-              {/* PANEL 1: PENGURUSAN PASUKAN & KONTINJEN (SEPERTI IMAGE 1) */}
+              {/* Panel Senarai Pasukan (Urusetia Sahaja) */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-blue-500/40 shadow-2xl backdrop-blur-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
@@ -670,12 +733,11 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Input Tambah Pasukan Baru */}
                 {canManageUndian ? (
                   <div className="flex gap-2 mb-4">
                     <input 
                       type="text" 
-                      placeholder="Tambah nama kontinjen / pasukan (cth: Selangor / Rumah Merah)" 
+                      placeholder="Tambah nama kontinjen / pasukan (cth: Selangor / Johor / Terengganu)" 
                       value={newTeamInput} 
                       onChange={(e) => setNewTeamInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleAddTeam(); }}
@@ -691,7 +753,6 @@ export default function App() {
                   </p>
                 )}
 
-                {/* Senarai Tags Pasukan Dengan Butang X */}
                 <div className="flex flex-wrap gap-2">
                   {teams.map((tm, idx) => (
                     <span key={idx} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-slate-950 border border-slate-700 text-slate-200 font-semibold shadow-sm">
@@ -706,7 +767,7 @@ export default function App() {
                 </div>
               </section>
 
-              {/* PANEL 2: PENTAS CABUTAN UNDIAN LANGSUNG */}
+              {/* Pentas Cabutan Undian Langsung */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-slate-800 pb-3">
                   <div>
@@ -734,7 +795,6 @@ export default function App() {
                   <div className="text-3xl md:text-5xl font-black text-emerald-400 py-3 tracking-wide">{drawDisplay}</div>
                 </div>
 
-                {/* Butang Tindakan (Termasuk "Undi Sukan Ini Terus") */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                   <button onClick={mulakanCabutan} disabled={isRolling || !canManageUndian} className="sm:col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-40">
                     <Play className="w-4 h-4" /> Mulakan Cabutan Rawak
@@ -756,7 +816,7 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Grid Keputusan Undian Kumpulan */}
+              {/* Grid Keputusan Undian Kumpulan di Tab Undian */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-bold text-white">Keputusan Rasmi Undian Kumpulan</h3>
@@ -765,44 +825,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {acaraList.map((s, idx) => {
-                    const spDraws = tournamentDraws[s.nama] || {};
-                    const groupKeys = Object.keys(spDraws);
-
-                    return (
-                      <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10">
-                        <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
-                          <span>🏆 {s.nama}</span>
-                          <span className="text-[10px] text-slate-300">{s.format}</span>
-                        </div>
-
-                        {groupKeys.length === 0 ? (
-                          <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
-                            Belum dibuat undian
-                          </div>
-                        ) : (
-                          groupKeys.map((grpName, gIdx) => (
-                            <div key={gIdx} className="mb-3 last:mb-0">
-                              <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
-                                <span>{grpName}</span>
-                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
-                              </div>
-                              <ul className="space-y-1">
-                                {spDraws[grpName].map((tm, tIdx) => (
-                                  <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white">
-                                    <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
-                                    <span>{tm}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                {renderUndianKumpulanGrid()}
               </section>
             </div>
           )}
@@ -862,7 +885,7 @@ export default function App() {
                       <input type="text" placeholder="Nama Sukan (cth: Futsal)" value={newAcara.nama} onChange={(e) => setNewAcara({...newAcara, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <select value={newAcara.format} onChange={(e) => setNewAcara({...newAcara, format: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm text-amber-400 font-bold">
                         <option value="Kalah Mati">Kalah Mati (Bracket)</option>
-                        <option value="Boling">Boling (Pin)</option>
+                        <option value="Boling">Boling (Mata Pasukan / Pin)</option>
                       </select>
                       <input type="number" placeholder="Bil Kumpulan" value={newAcara.kumpulan} onChange={(e) => setNewAcara({...newAcara, kumpulan: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg text-sm">Simpan Acara</button>
@@ -882,7 +905,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* KEMASKINI SKOR (AUTO DARI HASIL UNDIAN) */}
+                {/* KEMASKINI SKOR */}
                 {(currentUser.role === 'MASTER' || currentUser.role === 'SUKAN') && (
                   <div className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 space-y-4 backdrop-blur-md">
                     <h3 className="text-lg font-bold flex items-center gap-2 text-yellow-400">
@@ -902,16 +925,26 @@ export default function App() {
                           </select>
                         </div>
 
-                        {isBolingFormat ? (
+                        {isLeaderboardFormat ? (
                           <form onSubmit={handleSaveBoling} className="space-y-4 border-t border-slate-800 pt-4">
-                            <h4 className="text-sm font-bold text-yellow-400 uppercase">Pungutan Pin Pasukan ({selectedSukan})</h4>
+                            <h4 className="text-sm font-bold text-yellow-400 uppercase">
+                              KEDUDUKAN MATA PASUKAN ({selectedSukan})
+                            </h4>
                             {bolingPasukanRows.map((row, index) => (
                               <div key={index} className="flex items-center gap-3">
                                 <input type="text" placeholder="Pasukan" value={row.pasukan} onChange={(e) => { const cp = [...bolingPasukanRows]; cp[index].pasukan = e.target.value; setBolingPasukanRows(cp); }} className="w-2/3 p-2 bg-slate-900 border border-slate-700 rounded-lg text-sm" />
-                                <input type="number" placeholder="Pin" value={row.jumlahPin} onChange={(e) => { const cp = [...bolingPasukanRows]; cp[index].jumlahPin = Number(e.target.value); setBolingPasukanRows(cp); }} className="w-1/3 p-2 bg-slate-900 border border-slate-700 rounded-lg font-bold text-yellow-400 text-sm" />
+                                <input 
+                                  type="number" 
+                                  placeholder={selectedSukan.toLowerCase().includes('boling') || selectedSukan.toLowerCase().includes('bowling') ? "Pin" : "Mata"} 
+                                  value={row.jumlahPin} 
+                                  onChange={(e) => { const cp = [...bolingPasukanRows]; cp[index].jumlahPin = Number(e.target.value); setBolingPasukanRows(cp); }} 
+                                  className="w-1/3 p-2 bg-slate-900 border border-slate-700 rounded-lg font-bold text-yellow-400 text-sm" 
+                                />
                               </div>
                             ))}
-                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg">Simpan Skor Boling</button>
+                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold p-3 rounded-lg">
+                              Simpan Skor Pasukan
+                            </button>
                           </form>
                         ) : (
                           <form onSubmit={handleAddJadual} className="space-y-4 border-t border-slate-800 pt-4">
