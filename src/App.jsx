@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
+import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
 
 const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
@@ -159,7 +159,7 @@ export default function App() {
     await simpanPasukanKeSheets(updated);
   };
 
-  // Auto-populate skor dari hasil undian
+  // Auto-populate skor form admin dari hasil undian
   useEffect(() => {
     if (!selectedSukan) return;
 
@@ -483,59 +483,54 @@ export default function App() {
     });
   };
 
-  // Paparan Bracket
+  // LOGIK MENARIK NAMA PASUKAN DARI HASIL UNDIAN KE PAPARAN BRACKET
+  const sportDrawForView = tournamentDraws[selectedSukan] || {};
+  const kumpA_view = sportDrawForView["Kumpulan A"] || sportDrawForView["Liga Kumpulan"] || [];
+  const kumpB_view = sportDrawForView["Kumpulan B"] || [];
+
   const viewJadual = jadualList.filter(j => j.sukan === selectedSukan);
-  const viewSF1 = viewJadual.find(j => j.peringkat === 'Separuh Akhir 1') || { pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' };
-  const viewSF2 = viewJadual.find(j => j.peringkat === 'Separuh Akhir 2') || { pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' };
+  const sf1Match = viewJadual.find(j => j.peringkat === 'Separuh Akhir 1');
+  const sf2Match = viewJadual.find(j => j.peringkat === 'Separuh Akhir 2');
+
+  // Separuh Akhir 1 (Medan 1): Auto isi nama dari Kumpulan A jika admin belum kemaskini
+  const viewSF1 = {
+    pasukanA: sf1Match?.pasukanA || kumpA_view[0] || '-',
+    pasukanB: sf1Match?.pasukanB || kumpA_view[1] || '-',
+    skorA: sf1Match?.skorA ?? 0,
+    skorB: sf1Match?.skorB ?? 0,
+    pemenang: sf1Match?.pemenang || ''
+  };
+
+  // Separuh Akhir 2 (Medan 2): Auto isi nama dari Kumpulan B jika admin belum kemaskini
+  const viewSF2 = {
+    pasukanA: sf2Match?.pasukanA || kumpB_view[0] || '-',
+    pasukanB: sf2Match?.pasukanB || kumpB_view[1] || '-',
+    skorA: sf2Match?.skorA ?? 0,
+    skorB: sf2Match?.skorB ?? 0,
+    pemenang: sf2Match?.pemenang || ''
+  };
+
   const getLoser = (m) => (!m.pemenang || m.pemenang === 'Seri') ? '' : (m.pemenang === m.pasukanA ? m.pasukanB : m.pasukanA);
-  const viewAkhir = viewJadual.find(j => j.peringkat === 'Akhir') || { pasukanA: viewSF1.pemenang || '', pasukanB: viewSF2.pemenang || '', skorA: 0, skorB: 0, pemenang: '' };
-  const viewT3 = viewJadual.find(j => j.peringkat === 'Tempat Ke-3') || { pasukanA: getLoser(viewSF1) || '', pasukanB: getLoser(viewSF2) || '', skorA: 0, skorB: 0, pemenang: '' };
+  const akhMatch = viewJadual.find(j => j.peringkat === 'Akhir');
+  const t3Match = viewJadual.find(j => j.peringkat === 'Tempat Ke-3');
+
+  const viewAkhir = {
+    pasukanA: akhMatch?.pasukanA || viewSF1.pemenang || '',
+    pasukanB: akhMatch?.pasukanB || viewSF2.pemenang || '',
+    skorA: akhMatch?.skorA ?? 0,
+    skorB: akhMatch?.skorB ?? 0,
+    pemenang: akhMatch?.pemenang || ''
+  };
+
+  const viewT3 = {
+    pasukanA: t3Match?.pasukanA || getLoser(viewSF1) || '',
+    pasukanB: t3Match?.pasukanB || getLoser(viewSF2) || '',
+    skorA: t3Match?.skorA ?? 0,
+    skorB: t3Match?.skorB ?? 0,
+    pemenang: t3Match?.pemenang || ''
+  };
 
   const currentBolingList = bolingList.filter(b => b.sukan === selectedSukan).sort((a, b) => b.jumlahPin - a.jumlahPin);
-
-  // Komponen Reusable untuk Grid Keputusan Undian Kumpulan (Digunakan pada Tab Keputusan & Tab Undian)
-  const renderUndianKumpulanGrid = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      {acaraList.map((s, idx) => {
-        const spDraws = tournamentDraws[s.nama] || {};
-        const groupKeys = Object.keys(spDraws);
-
-        return (
-          <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10 flex flex-col justify-between">
-            <div>
-              <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
-                <span>🏆 {s.nama}</span>
-                <span className="text-[10px] text-slate-300 font-semibold">{s.format}</span>
-              </div>
-
-              {groupKeys.length === 0 ? (
-                <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
-                  Belum dibuat undian
-                </div>
-              ) : (
-                groupKeys.map((grpName, gIdx) => (
-                  <div key={gIdx} className="mb-3 last:mb-0">
-                    <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
-                      <span>{grpName}</span>
-                      <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
-                    </div>
-                    <ul className="space-y-1">
-                      {spDraws[grpName].map((tm, tIdx) => (
-                        <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white font-medium">
-                          <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
-                          <span>{tm}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
 
   return (
     <div className="min-h-screen text-white font-sans relative overflow-x-hidden">
@@ -610,7 +605,7 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Perlawanan / Kedudukan Mata Pasukan (Label & Ikon Baru) */}
+              {/* Perlawanan / Kedudukan Mata Pasukan */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl space-y-6 backdrop-blur-md">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h2 className="text-xl font-bold text-blue-400 tracking-wide uppercase">
@@ -663,54 +658,85 @@ export default function App() {
                 ) : (
                   <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/80 overflow-x-auto">
                     <div className="min-w-[650px] grid grid-cols-2 gap-8 items-center">
+                      
+                      {/* SEPARUH AKHIR: MEDAN 1 (KUMPULAN A) & MEDAN 2 (KUMPULAN B) */}
                       <div className="space-y-8">
                         <h3 className="text-center font-black text-slate-300 tracking-wider">SEPARUH AKHIR</h3>
+                        
+                        {/* MEDAN 1: AUTO DARI KUMPULAN A (CTH: MERAH VS HIJAU) */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
-                          <div className="flex justify-between items-center"><span className="font-bold">{viewSF1.pasukanA || '-'}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF1.skorA || 0}</span></div>
-                          <div className="flex justify-between items-center"><span className="font-bold">{viewSF1.pasukanB || '-'}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF1.skorB || 0}</span></div>
+                          <div className="flex justify-between items-center">
+                            <span className={`font-bold ${viewSF1.pemenang && viewSF1.pemenang === viewSF1.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
+                              {viewSF1.pasukanA}
+                            </span>
+                            <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF1.skorA}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className={`font-bold ${viewSF1.pemenang && viewSF1.pemenang === viewSF1.pasukanB ? 'text-yellow-400' : 'text-slate-100'}`}>
+                              {viewSF1.pasukanB}
+                            </span>
+                            <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF1.skorB}</span>
+                          </div>
                         </div>
+
+                        {/* MEDAN 2: AUTO DARI KUMPULAN B (CTH: KUNING VS BIRU) */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
-                          <div className="flex justify-between items-center"><span className="font-bold">{viewSF2.pasukanA || '-'}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF2.skorA || 0}</span></div>
-                          <div className="flex justify-between items-center"><span className="font-bold">{viewSF2.pasukanB || '-'}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF2.skorB || 0}</span></div>
+                          <div className="flex justify-between items-center">
+                            <span className={`font-bold ${viewSF2.pemenang && viewSF2.pemenang === viewSF2.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
+                              {viewSF2.pasukanA}
+                            </span>
+                            <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF2.skorA}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className={`font-bold ${viewSF2.pemenang && viewSF2.pemenang === viewSF2.pasukanB ? 'text-yellow-400' : 'text-slate-100'}`}>
+                              {viewSF2.pasukanB}
+                            </span>
+                            <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF2.skorB}</span>
+                          </div>
                         </div>
                       </div>
 
+                      {/* AKHIR & TEMPAT KE-3 */}
                       <div className="space-y-6">
                         <div>
                           <h3 className="text-center font-black text-yellow-400 tracking-wider mb-2">🥇 PERLAWANAN AKHIR</h3>
                           <div className="bg-slate-900/70 border-2 border-yellow-500/50 rounded-lg p-3 shadow-xl space-y-2 min-h-[80px]">
-                            <div className="flex justify-between items-center"><span className="font-bold">{viewAkhir.pasukanA || ''}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewAkhir.pasukanA ? viewAkhir.skorA : '-'}</span></div>
-                            <div className="flex justify-between items-center"><span className="font-bold">{viewAkhir.pasukanB || ''}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewAkhir.pasukanB ? viewAkhir.skorB : '-'}</span></div>
+                            <div className="flex justify-between items-center">
+                              <span className={`font-bold ${viewAkhir.pemenang && viewAkhir.pemenang === viewAkhir.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
+                                {viewAkhir.pasukanA || '-'}
+                              </span>
+                              <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewAkhir.pasukanA ? viewAkhir.skorA : '-'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className={`font-bold ${viewAkhir.pemenang && viewAkhir.pemenang === viewAkhir.pasukanB ? 'text-yellow-400' : 'text-slate-100'}`}>
+                                {viewAkhir.pasukanB || '-'}
+                              </span>
+                              <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewAkhir.pasukanB ? viewAkhir.skorB : '-'}</span>
+                            </div>
                           </div>
                         </div>
                         <div>
                           <h3 className="text-center font-black text-amber-500 tracking-wider mb-2">🥉 TEMPAT KE-3 & KE-4</h3>
                           <div className="bg-slate-900/70 border-2 border-amber-600/40 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
-                            <div className="flex justify-between items-center"><span className="font-bold">{viewT3.pasukanA || ''}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewT3.pasukanA ? viewT3.skorA : '-'}</span></div>
-                            <div className="flex justify-between items-center"><span className="font-bold">{viewT3.pasukanB || ''}</span><span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewT3.pasukanB ? viewT3.skorB : '-'}</span></div>
+                            <div className="flex justify-between items-center">
+                              <span className={`font-bold ${viewT3.pemenang && viewT3.pemenang === viewT3.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
+                                {viewT3.pasukanA || '-'}
+                              </span>
+                              <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewT3.pasukanA ? viewT3.skorA : '-'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className={`font-bold ${viewT3.pemenang && viewT3.pemenang === viewT3.pasukanB ? 'text-yellow-400' : 'text-slate-100'}`}>
+                                {viewT3.pasukanB || '-'}
+                              </span>
+                              <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewT3.pasukanB ? viewT3.skorB : '-'}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
+
                     </div>
                   </div>
                 )}
-              </section>
-
-              {/* PAPARAN KEPUTUSAN UNDIAN DI TAB KEPUTUSAN (SUSUNAN SAMA DENGAN IMAGE 1) */}
-              <section className="bg-slate-900/60 p-6 rounded-xl border border-slate-700/50 shadow-2xl backdrop-blur-md">
-                <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-                  <div>
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wide">
-                      Keputusan Rasmi Undian Kumpulan
-                    </h3>
-                    <p className="text-xs text-slate-400">Susunan kumpulan dan pasukan bagi setiap acara sukan.</p>
-                  </div>
-                  <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 flex items-center gap-1.5">
-                    <Printer className="w-4 h-4" /> Cetak / PDF
-                  </button>
-                </div>
-
-                {renderUndianKumpulanGrid()}
               </section>
             </>
           )}
@@ -825,7 +851,44 @@ export default function App() {
                   </button>
                 </div>
 
-                {renderUndianKumpulanGrid()}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {acaraList.map((s, idx) => {
+                    const spDraws = tournamentDraws[s.nama] || {};
+                    const groupKeys = Object.keys(spDraws);
+
+                    return (
+                      <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10">
+                        <div className="text-xs font-black text-amber-400 mb-3 uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
+                          <span>🏆 {s.nama}</span>
+                          <span className="text-[10px] text-slate-300">{s.format}</span>
+                        </div>
+
+                        {groupKeys.length === 0 ? (
+                          <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
+                            Belum dibuat undian
+                          </div>
+                        ) : (
+                          groupKeys.map((grpName, gIdx) => (
+                            <div key={gIdx} className="mb-3 last:mb-0">
+                              <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
+                                <span>{grpName}</span>
+                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
+                              </div>
+                              <ul className="space-y-1">
+                                {spDraws[grpName].map((tm, tIdx) => (
+                                  <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white">
+                                    <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
+                                    <span>{tm}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </section>
             </div>
           )}
