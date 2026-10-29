@@ -300,9 +300,9 @@ export default function App() {
       const sNama = s.nama.toLowerCase();
       if (sFormat.includes('boling') || sFormat.includes('liga') || sNama.includes('menembak') || sNama.includes('golf') || sNama.includes('memanah')) {
         const bRows = bolingList.filter(b => b.sukan.toLowerCase() === s.nama.toLowerCase()).sort((a, b) => b.jumlahPin - a.jumlahPin);
-        if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 5; }
-        if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 3; }
-        if (bRows[2] && bRows[2].jumlahPin > 0) { initTeam(bRows[2].pasukan); leaderTeams[bRows[2].pasukan].gangsa += 1; leaderTeams[bRows[2].pasukan].mata += 1; }
+        if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 10; }
+        if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 7; }
+        if (bRows[2] && bRows[2].jumlahPin > 0) { initTeam(bRows[2].pasukan); leaderTeams[bRows[2].pasukan].gangsa += 1; leaderTeams[bRows[2].pasukan].mata += 5; }
       } else {
         const sJadual = jadualList.filter(j => j.sukan.toLowerCase() === s.nama.toLowerCase());
         const matchAkhir = sJadual.find(j => j.peringkat === 'Akhir');
@@ -311,13 +311,13 @@ export default function App() {
           const johan = matchAkhir.pemenang;
           const naib = matchAkhir.pemenang === matchAkhir.pasukanA ? matchAkhir.pasukanB : matchAkhir.pasukanA;
           initTeam(johan); initTeam(naib);
-          if (leaderTeams[johan]) { leaderTeams[johan].emas += 1; leaderTeams[johan].mata += 5; }
-          if (leaderTeams[naib]) { leaderTeams[naib].perak += 1; leaderTeams[naib].mata += 3; }
+          if (leaderTeams[johan]) { leaderTeams[johan].emas += 1; leaderTeams[johan].mata += 10; }
+          if (leaderTeams[naib]) { leaderTeams[naib].perak += 1; leaderTeams[naib].mata += 7; }
         }
         if (matchT3 && matchT3.pemenang && matchT3.pemenang !== 'Seri') {
           const t3 = matchT3.pemenang;
           initTeam(t3);
-          if (leaderTeams[t3]) { leaderTeams[t3].gangsa += 1; leaderTeams[t3].mata += 1; }
+          if (leaderTeams[t3]) { leaderTeams[t3].gangsa += 1; leaderTeams[t3].mata += 5; }
         }
       }
     });
