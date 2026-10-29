@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
+import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, Dices, Play, Forward, Printer, RotateCcw, ShieldCheck, Users } from 'lucide-react';
 
 const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
@@ -20,7 +20,7 @@ export default function App() {
   const [bolingIndividuList, setBolingIndividuList] = useState([]);
 
   // Data Pasukan (Dinamik)
-  const [teams, setTeams] = useState(["Merah", "Biru", "Hijau", "Kuning"]);
+  const [teams, setTeams] = useState(["Gemini", "Meta", "Gamma", "Copilot"]);
   const [newTeamInput, setNewTeamInput] = useState("");
 
   // Data Undian
@@ -72,24 +72,34 @@ export default function App() {
       // 3. Tarik Tab Jadual
       if (data && Array.isArray(data.jadual) && data.jadual.length > 1) {
         setJadualList(data.jadual.slice(1).map(row => ({
-          id: String(row[0] || ''), sukan: String(row[1] || ''), peringkat: String(row[2] || ''), 
-          pasukanA: String(row[3] || ''), pasukanB: String(row[4] || ''), skorA: Number(row[5] || 0), 
-          skorB: Number(row[6] || 0), pemenang: String(row[7] || '')
-        })).filter(j => j.sukan.trim() !== ''));
+          id: String(row[0] || '').trim(),
+          sukan: String(row[1] || '').trim(),
+          peringkat: String(row[2] || '').trim(),
+          pasukanA: String(row[3] || '').trim(),
+          pasukanB: String(row[4] || '').trim(),
+          skorA: Number(row[5] || 0),
+          skorB: Number(row[6] || 0),
+          pemenang: String(row[7] || '').trim()
+        })).filter(j => j.sukan !== ''));
       }
 
       // 4. Tarik Tab Boling / Skor Pasukan
       if (data && Array.isArray(data.boling) && data.boling.length > 1) {
         setBolingList(data.boling.slice(1).map(row => ({
-          sukan: String(row[1] || ''), pasukan: String(row[2] || ''), jumlahPin: Number(row[3] || 0)
-        })).filter(b => b.sukan.trim() !== ''));
+          sukan: String(row[1] || '').trim(),
+          pasukan: String(row[2] || '').trim(),
+          jumlahPin: Number(row[3] || 0)
+        })).filter(b => b.sukan !== ''));
       }
 
       // 5. Tarik Tab Boling Individu
       if (data && Array.isArray(data.bolingIndividu) && data.bolingIndividu.length > 1) {
         setBolingIndividuList(data.bolingIndividu.slice(1).map(row => ({
-          sukan: String(row[1] || ''), namaPemain: String(row[2] || ''), pasukan: String(row[3] || ''), pinIndividu: Number(row[4] || 0)
-        })).filter(bi => bi.sukan.trim() !== ''));
+          sukan: String(row[1] || '').trim(),
+          namaPemain: String(row[2] || '').trim(),
+          pasukan: String(row[3] || '').trim(),
+          pinIndividu: Number(row[4] || 0)
+        })).filter(bi => bi.sukan !== ''));
       }
 
       // 6. Tarik Tab Keputusan Undian
@@ -150,7 +160,7 @@ export default function App() {
   const handleAddTeam = async () => {
     const name = newTeamInput.trim();
     if (!name) return;
-    if (teams.includes(name)) return alert("Pasukan sudah wujud!");
+    if (teams.map(t => t.toLowerCase()).includes(name.toLowerCase())) return alert("Pasukan sudah wujud!");
     const updated = [...teams, name];
     setTeams(updated);
     setNewTeamInput("");
@@ -164,7 +174,6 @@ export default function App() {
     await simpanPasukanKeSheets(updated);
   };
 
-  // Auto-populate skor form admin dari hasil undian
   useEffect(() => {
     if (!selectedSukan) return;
 
@@ -287,43 +296,64 @@ export default function App() {
     setNewJadual(prev => ({ ...prev, skorA: Number(sA), skorB: Number(sB), pemenang: win }));
   };
 
-  // Carta Pungutan Pingat
+  // Carta Pungutan Pingat (Emas 10, Perak 7, Gangsa 5)
   const calculateLeaderboard = () => {
     const leaderTeams = {};
-    const initTeam = (tName) => {
-      if (!tName || tName === 'TBD' || tName === 'Seri' || tName === '-') return;
-      if (!leaderTeams[tName]) leaderTeams[tName] = { pasukan: tName, emas: 0, perak: 0, gangsa: 0, mata: 0 };
+    const initTeam = (rawName) => {
+      if (!rawName) return null;
+      const tName = String(rawName).trim();
+      if (!tName || tName === 'TBD' || tName === 'Seri' || tName === '-') return null;
+      
+      const key = tName.toLowerCase();
+      if (!leaderTeams[key]) {
+        leaderTeams[key] = { pasukan: tName, emas: 0, perak: 0, gangsa: 0, mata: 0 };
+      }
+      return key;
     };
 
     acaraList.forEach(s => {
       const sFormat = s.format.toLowerCase();
       const sNama = s.nama.toLowerCase();
+      
       if (sFormat.includes('boling') || sFormat.includes('liga') || sNama.includes('menembak') || sNama.includes('golf') || sNama.includes('memanah')) {
         const bRows = bolingList.filter(b => b.sukan.toLowerCase() === s.nama.toLowerCase()).sort((a, b) => b.jumlahPin - a.jumlahPin);
-        if (bRows[0] && bRows[0].jumlahPin > 0) { initTeam(bRows[0].pasukan); leaderTeams[bRows[0].pasukan].emas += 1; leaderTeams[bRows[0].pasukan].mata += 10; }
-        if (bRows[1] && bRows[1].jumlahPin > 0) { initTeam(bRows[1].pasukan); leaderTeams[bRows[1].pasukan].perak += 1; leaderTeams[bRows[1].pasukan].mata += 7; }
-        if (bRows[2] && bRows[2].jumlahPin > 0) { initTeam(bRows[2].pasukan); leaderTeams[bRows[2].pasukan].gangsa += 1; leaderTeams[bRows[2].pasukan].mata += 5; }
+        
+        if (bRows[0] && bRows[0].jumlahPin > 0) {
+          const k = initTeam(bRows[0].pasukan);
+          if (k) { leaderTeams[k].emas += 1; leaderTeams[k].mata += 10; }
+        }
+        if (bRows[1] && bRows[1].jumlahPin > 0) {
+          const k = initTeam(bRows[1].pasukan);
+          if (k) { leaderTeams[k].perak += 1; leaderTeams[k].mata += 7; }
+        }
+        if (bRows[2] && bRows[2].jumlahPin > 0) {
+          const k = initTeam(bRows[2].pasukan);
+          if (k) { leaderTeams[k].gangsa += 1; leaderTeams[k].mata += 5; }
+        }
       } else {
         const sJadual = jadualList.filter(j => j.sukan.toLowerCase() === s.nama.toLowerCase());
         const matchAkhir = sJadual.find(j => j.peringkat === 'Akhir');
         const matchT3 = sJadual.find(j => j.peringkat === 'Tempat Ke-3');
+
         if (matchAkhir && matchAkhir.pemenang && matchAkhir.pemenang !== 'Seri') {
-          const johan = matchAkhir.pemenang;
-          const naib = matchAkhir.pemenang === matchAkhir.pasukanA ? matchAkhir.pasukanB : matchAkhir.pasukanA;
-          initTeam(johan); initTeam(naib);
-          if (leaderTeams[johan]) { leaderTeams[johan].emas += 1; leaderTeams[johan].mata += 10; }
-          if (leaderTeams[naib]) { leaderTeams[naib].perak += 1; leaderTeams[naib].mata += 7; }
+          const johanKey = initTeam(matchAkhir.pemenang);
+          const naibNama = matchAkhir.pemenang.trim() === matchAkhir.pasukanA.trim() ? matchAkhir.pasukanB : matchAkhir.pasukanA;
+          const naibKey = initTeam(naibNama);
+
+          if (johanKey) { leaderTeams[johanKey].emas += 1; leaderTeams[johanKey].mata += 10; }
+          if (naibKey) { leaderTeams[naibKey].perak += 1; leaderTeams[naibKey].mata += 7; }
         }
+
         if (matchT3 && matchT3.pemenang && matchT3.pemenang !== 'Seri') {
-          const t3 = matchT3.pemenang;
-          initTeam(t3);
-          if (leaderTeams[t3]) { leaderTeams[t3].gangsa += 1; leaderTeams[t3].mata += 5; }
+          const t3Key = initTeam(matchT3.pemenang);
+          if (t3Key) { leaderTeams[t3Key].gangsa += 1; leaderTeams[t3Key].mata += 5; }
         }
       }
     });
 
-    return Object.values(leaderTeams).sort((a, b) => b.mata - a.mata || b.emas - a.emas);
+    return Object.values(leaderTeams).sort((a, b) => b.mata - a.mata || b.emas - a.emas || b.perak - a.perak);
   };
+
   const mataList = calculateLeaderboard();
 
   // Pengurusan Acara
@@ -487,7 +517,7 @@ export default function App() {
     });
   };
 
-  // LOGIK MENARIK NAMA PASUKAN DARI HASIL UNDIAN KE PAPARAN BRACKET
+  // Logik Bracket
   const sportDrawForView = tournamentDraws[selectedSukan] || {};
   const kumpA_view = sportDrawForView["Kumpulan A"] || sportDrawForView["Liga Kumpulan"] || [];
   const kumpB_view = sportDrawForView["Kumpulan B"] || [];
@@ -532,16 +562,15 @@ export default function App() {
     pemenang: t3Match?.pemenang || ''
   };
 
-  // LOGIK MENJANA KEDUDUKAN MATA PASUKAN:
-  // Gabungkan senarai pasukan daripada undian dan skor daripada pangkalan data
   const getLeaderboardTableData = () => {
     const existingScores = bolingList.filter(b => b.sukan.toLowerCase() === selectedSukan.toLowerCase());
-    
-    // Ambil pasukan yang telah diundi
     const drawn = tournamentDraws[selectedSukan] || {};
     const drawnTeamsList = [];
     Object.keys(drawn).forEach(grp => {
-      drawn[grp].forEach(t => { if (!drawnTeamsList.includes(t)) drawnTeamsList.push(t); });
+      drawn[grp].forEach(t => { 
+        const cleanT = t.trim();
+        if (!drawnTeamsList.includes(cleanT)) drawnTeamsList.push(cleanT); 
+      });
     });
 
     const activeList = drawnTeamsList.length > 0 ? drawnTeamsList : teams;
@@ -554,12 +583,33 @@ export default function App() {
       };
     });
 
-    // Susun mengikut jumlah skor/mata tertinggi
     listWithScores.sort((a, b) => b.jumlahPin - a.jumlahPin);
     return listWithScores;
   };
 
   const currentBolingList = getLeaderboardTableData();
+
+  // Pengiraan Pemenang Pingat Acara Terpilih
+  const getMedalWinners = () => {
+    if (isLeaderboardFormat) {
+      const sorted = [...currentBolingList].filter(b => b.jumlahPin > 0);
+      return {
+        emas: sorted[0]?.pasukan || '-',
+        perak: sorted[1]?.pasukan || '-',
+        gangsa: sorted[2]?.pasukan || '-'
+      };
+    } else {
+      const emas = viewAkhir.pemenang && viewAkhir.pemenang !== 'Seri' ? viewAkhir.pemenang : '-';
+      let perak = '-';
+      if (viewAkhir.pemenang && viewAkhir.pemenang !== 'Seri' && viewAkhir.pasukanA && viewAkhir.pasukanB) {
+        perak = viewAkhir.pemenang === viewAkhir.pasukanA ? viewAkhir.pasukanB : viewAkhir.pasukanA;
+      }
+      const gangsa = viewT3.pemenang && viewT3.pemenang !== 'Seri' ? viewT3.pemenang : '-';
+      return { emas, perak, gangsa };
+    }
+  };
+
+  const winners = getMedalWinners();
 
   return (
     <div className="min-h-screen text-white font-sans relative overflow-x-hidden">
@@ -610,9 +660,9 @@ export default function App() {
                       <tr className="border-b border-slate-700/80 text-slate-300">
                         <th className="p-3">Kedudukan</th>
                         <th className="p-3">Pasukan</th>
-                        <th className="p-3 text-center">🥇 Emas</th>
-                        <th className="p-3 text-center">🥈 Perak</th>
-                        <th className="p-3 text-center">🥉 Gangsa</th>
+                        <th className="p-3 text-center">🥇 Emas (10)</th>
+                        <th className="p-3 text-center">🥈 Perak (7)</th>
+                        <th className="p-3 text-center">🥉 Gangsa (5)</th>
                         <th className="p-3 text-right">Jumlah Mata</th>
                       </tr>
                     </thead>
@@ -699,11 +749,10 @@ export default function App() {
                   <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800/80 overflow-x-auto">
                     <div className="min-w-[650px] grid grid-cols-2 gap-8 items-center">
                       
-                      {/* SEPARUH AKHIR: MEDAN 1 (KUMPULAN A) & MEDAN 2 (KUMPULAN B) */}
+                      {/* Separuh Akhir */}
                       <div className="space-y-8">
                         <h3 className="text-center font-black text-slate-300 tracking-wider">SEPARUH AKHIR</h3>
                         
-                        {/* MEDAN 1: AUTO DARI KUMPULAN A */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
                           <div className="flex justify-between items-center">
                             <span className={`font-bold ${viewSF1.pemenang && viewSF1.pemenang === viewSF1.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
@@ -719,7 +768,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* MEDAN 2: AUTO DARI KUMPULAN B */}
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2 min-h-[80px]">
                           <div className="flex justify-between items-center">
                             <span className={`font-bold ${viewSF2.pemenang && viewSF2.pemenang === viewSF2.pasukanA ? 'text-yellow-400' : 'text-slate-100'}`}>
@@ -736,7 +784,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* AKHIR & TEMPAT KE-3 */}
+                      {/* Akhir & Tempat Ke-3 */}
                       <div className="space-y-6">
                         <div>
                           <h3 className="text-center font-black text-yellow-400 tracking-wider mb-2">🥇 PERLAWANAN AKHIR</h3>
@@ -777,6 +825,43 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* KEPUTUSAN PINGAT ACARA TERPILIH */}
+                <div className="bg-slate-900/80 p-5 rounded-xl border border-slate-700/80 mt-6 backdrop-blur-md">
+                  <h3 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                    <Award className="w-5 h-5 text-yellow-400" /> KEPUTUSAN PINGAT ({selectedSukan})
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-slate-950/70 p-3.5 rounded-xl border border-yellow-500/40 text-center shadow-lg">
+                      <span className="text-[11px] text-yellow-400/90 uppercase font-black tracking-wider block mb-1">
+                        🥇 JOHAN (EMAS)
+                      </span>
+                      <span className="text-lg font-black text-white block">
+                        {winners.emas}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-400/40 text-center shadow-lg">
+                      <span className="text-[11px] text-slate-300 uppercase font-black tracking-wider block mb-1">
+                        🥈 NAIB JOHAN (PERAK)
+                      </span>
+                      <span className="text-lg font-black text-white block">
+                        {winners.perak}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950/70 p-3.5 rounded-xl border border-amber-600/40 text-center shadow-lg">
+                      <span className="text-[11px] text-amber-500 uppercase font-black tracking-wider block mb-1">
+                        🥉 TEMPAT KE-3 (GANGSA)
+                      </span>
+                      <span className="text-lg font-black text-white block">
+                        {winners.gangsa}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
               </section>
             </>
           )}
@@ -785,7 +870,7 @@ export default function App() {
           {activeTab === 'undian' && (
             <div className="space-y-6">
 
-              {/* Panel Senarai Pasukan (Urusetia Sahaja) */}
+              {/* Panel Senarai Pasukan */}
               <section className="bg-slate-900/60 p-6 rounded-xl border border-blue-500/40 shadow-2xl backdrop-blur-md">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
@@ -803,7 +888,7 @@ export default function App() {
                   <div className="flex gap-2 mb-4">
                     <input 
                       type="text" 
-                      placeholder="Tambah nama kontinjen / pasukan (cth: Selangor / Johor / Terengganu)" 
+                      placeholder="Tambah nama kontinjen / pasukan" 
                       value={newTeamInput} 
                       onChange={(e) => setNewTeamInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleAddTeam(); }}
@@ -988,7 +1073,6 @@ export default function App() {
                       <input type="text" placeholder="Nama Sukan (cth: Futsal)" value={newAcara.nama} onChange={(e) => setNewAcara({...newAcara, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <select value={newAcara.format} onChange={(e) => setNewAcara({...newAcara, format: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm text-amber-400 font-bold">
                         <option value="Kalah Mati">Kalah Mati (Bracket)</option>
-                        <option value="Liga">Liga Kumpulan</option>
                         <option value="Boling">Boling / Mata Pasukan</option>
                       </select>
                       <input type="number" placeholder="Bil Kumpulan" value={newAcara.kumpulan} onChange={(e) => setNewAcara({...newAcara, kumpulan: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
