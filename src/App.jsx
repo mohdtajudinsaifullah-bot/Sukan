@@ -3,14 +3,6 @@ import { Trophy, Medal, RefreshCw, Lock, LogOut, Plus, Trash2, Award, Dices, Pla
 
 const API_URL = "https://script.google.com/macros/s/AKfycbxDbzkwtItpfcg1rrE8z9rAZSB86ceKOdmS8osgYcg-KSdIk4KisMfXJxJKqoCYxNcnfg/exec";
 
-const SUB_CATEGORIES_BADMINTON = [
-  "1. Perseorangan Lelaki (MS)",
-  "2. Perseorangan Wanita (WS)",
-  "3. Beregu Lelaki (MD)",
-  "4. Beregu Wanita (WD)",
-  "5. Beregu Campuran (XD)"
-];
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('public');
   const [loading, setLoading] = useState(false);
@@ -41,20 +33,22 @@ export default function App() {
   const [isRolling, setIsRolling] = useState(false);
 
   // Form State Tambah Acara & Skor
-  const [newAcara, setNewAcara] = useState({ nama: '', format: 'Kalah Mati (Berpasukan 5 Acara)', kumpulan: 2 });
+  const [newAcara, setNewAcara] = useState({ nama: '', format: 'Kalah Mati (Berpasukan)', kumpulan: 2 });
   const [newJadual, setNewJadual] = useState({ peringkat: 'Separuh Akhir 1', pasukanA: '', pasukanB: '', skorA: 0, skorB: 0, pemenang: '' });
   
-  // State 5 Sub-Acara Badminton
-  const [subMatches, setSubMatches] = useState(
-    SUB_CATEGORIES_BADMINTON.map(kat => ({ kategori: kat, skorA: 0, skorB: 0, pemenangSub: '' }))
-  );
+  // State Sub-Acara Dinamik (Boleh ditambah/dipadam oleh Admin secara bebas)
+  const [subMatches, setSubMatches] = useState([
+    { kategori: 'Perseorangan Lelaki', skorA: 0, skorB: 0, pemenangSub: '' },
+    { kategori: 'Perseorangan Wanita', skorA: 0, skorB: 0, pemenangSub: '' },
+    { kategori: 'Beregu Lelaki', skorA: 0, skorB: 0, pemenangSub: '' }
+  ]);
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
 
   const [bolingPasukanRows, setBolingPasukanRows] = useState([]);
   const [bolingIndividuRows, setBolingIndividuRows] = useState([
     { namaPemain: '', pasukan: '', pinIndividu: 0 }
   ]);
 
-  // UI State: Buka/Tutup Perincian Sub-Acara di Paparan Awam
   const [expandedTie, setExpandedTie] = useState(null);
 
   const fetchData = async () => {
@@ -100,7 +94,7 @@ export default function App() {
         })).filter(j => j.sukan !== ''));
       }
 
-      // 4. Tarik Tab JadualSub (5 Acara Tie)
+      // 4. Tarik Tab JadualSub
       if (data && Array.isArray(data.jadualSub) && data.jadualSub.length > 1) {
         setJadualSubList(data.jadualSub.slice(1).map(row => ({
           sukan: String(row[0] || '').trim(),
@@ -161,15 +155,15 @@ export default function App() {
   }, []);
 
   const currentSportObj = acaraList.find(a => a.nama.toLowerCase() === selectedSukan.toLowerCase()) || { format: 'Kalah Mati' };
-  const isBadmintonTeamFormat = currentSportObj.format.toLowerCase().includes('berpasukan') || selectedSukan.toLowerCase().includes('badminton');
+  const isTeamMatchFormat = currentSportObj.format.toLowerCase().includes('berpasukan');
   const isLeaderboardFormat = (currentSportObj.format.toLowerCase().includes('boling') || 
                               currentSportObj.format.toLowerCase().includes('liga') ||
                               selectedSukan.toLowerCase().includes('menembak') ||
                               selectedSukan.toLowerCase().includes('golf') ||
-                              selectedSukan.toLowerCase().includes('memanah')) && !isBadmintonTeamFormat;
+                              selectedSukan.toLowerCase().includes('memanah')) && !isTeamMatchFormat;
 
   useEffect(() => {
-    const sp = acaraList.find(a => a.nama === selectedSportUndian);
+    const sp = acaraList.find(a => a.nama.toLowerCase() === selectedSportUndian.toLowerCase());
     if (sp && sp.kumpulan) {
       setGroupCountUndian(Number(sp.kumpulan));
     }
@@ -203,7 +197,7 @@ export default function App() {
     await simpanPasukanKeSheets(updated);
   };
 
-  // Auto-Populate Pasukan A & B dalam Borang Admin
+  // Auto-populate skor form admin
   useEffect(() => {
     if (!selectedSukan) return;
 
@@ -226,15 +220,15 @@ export default function App() {
 
     const matched = jadualList.find(j => j.sukan.toLowerCase() === selectedSukan.toLowerCase() && j.peringkat === newJadual.peringkat);
     
-    // Tarik 5 Sub-Acara yang sudah disimpan (jika ada)
+    // Ambil sub-acara jika ada rekod simpanan di Google Sheets
     const existingSubs = jadualSubList.filter(s => s.sukan.toLowerCase() === selectedSukan.toLowerCase() && s.peringkat === newJadual.peringkat);
     if (existingSubs.length > 0) {
-      setSubMatches(SUB_CATEGORIES_BADMINTON.map(kat => {
-        const found = existingSubs.find(es => es.kategori === kat);
-        return found ? { kategori: kat, skorA: found.skorA, skorB: found.skorB, pemenangSub: found.pemenangSub } : { kategori: kat, skorA: 0, skorB: 0, pemenangSub: '' };
-      }));
-    } else {
-      setSubMatches(SUB_CATEGORIES_BADMINTON.map(kat => ({ kategori: kat, skorA: 0, skorB: 0, pemenangSub: '' })));
+      setSubMatches(existingSubs.map(es => ({
+        kategori: es.kategori,
+        skorA: es.skorA,
+        skorB: es.skorB,
+        pemenangSub: es.pemenangSub
+      })));
     }
 
     if (matched) {
@@ -282,25 +276,40 @@ export default function App() {
         pemenang: ''
       }));
     }
-  }, [selectedSukan, newJadual.peringkat, tournamentDraws, jadualList, jadualSubList, isLeaderboardFormat, isBadmintonTeamFormat, bolingList, teams]);
+  }, [selectedSukan, newJadual.peringkat, tournamentDraws, jadualList, jadualSubList, isLeaderboardFormat, isTeamMatchFormat, bolingList, teams]);
 
-  // Logik Kemas Kini Sub-Acara Badminton Berpasukan (Kira Auto 3/2)
-  const handleSubWinnerSelect = (index, winnerName) => {
-    const updated = [...subMatches];
-    updated[index].pemenangSub = winnerName;
+  // Tambah / Buang Kategori Sub-Acara Dinamik
+  const handleAddCustomCategory = () => {
+    const name = customCategoryInput.trim();
+    if (!name) return;
+    if (subMatches.some(m => m.kategori.toLowerCase() === name.toLowerCase())) {
+      return alert("Kategori ini sudah ada dalam senarai!");
+    }
+    const updated = [...subMatches, { kategori: name, skorA: 0, skorB: 0, pemenangSub: '' }];
     setSubMatches(updated);
+    setCustomCategoryInput('');
+    recalculateTeamWinner(updated);
+  };
 
-    // Kira jumlah menang A dan B
+  const handleRemoveCustomCategory = (idx) => {
+    if (subMatches.length <= 1) return alert("Perlu ada sekurang-kurangnya 1 kategori acara!");
+    const updated = subMatches.filter((_, i) => i !== idx);
+    setSubMatches(updated);
+    recalculateTeamWinner(updated);
+  };
+
+  const recalculateTeamWinner = (matchesList) => {
     let countA = 0;
     let countB = 0;
-    updated.forEach(m => {
+    matchesList.forEach(m => {
       if (m.pemenangSub === newJadual.pasukanA) countA++;
       else if (m.pemenangSub === newJadual.pasukanB) countB++;
     });
 
+    const majorityNeeded = Math.ceil(matchesList.length / 2);
     let overallWinner = '';
-    if (countA >= 3) overallWinner = newJadual.pasukanA;
-    else if (countB >= 3) overallWinner = newJadual.pasukanB;
+    if (countA >= majorityNeeded) overallWinner = newJadual.pasukanA;
+    else if (countB >= majorityNeeded) overallWinner = newJadual.pasukanB;
     else if (countA > countB) overallWinner = newJadual.pasukanA;
     else if (countB > countA) overallWinner = newJadual.pasukanB;
 
@@ -310,6 +319,13 @@ export default function App() {
       skorB: countB,
       pemenang: overallWinner
     }));
+  };
+
+  const handleSubWinnerSelect = (index, winnerName) => {
+    const updated = [...subMatches];
+    updated[index].pemenangSub = winnerName;
+    setSubMatches(updated);
+    recalculateTeamWinner(updated);
   };
 
   const handleLoginByEmail = async (e) => {
@@ -434,7 +450,7 @@ export default function App() {
         method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'addAcara', ...newAcara })
       });
-      setNewAcara({ nama: '', format: 'Kalah Mati (Berpasukan 5 Acara)', kumpulan: 2 });
+      setNewAcara({ nama: '', format: 'Kalah Mati (Berpasukan)', kumpulan: 2 });
       setTimeout(fetchData, 1200);
     } catch (err) { console.error(err); setLoading(false); }
   };
@@ -462,7 +478,7 @@ export default function App() {
           id: 'M' + Date.now().toString().slice(-4), 
           ...newJadual, 
           sukan: selectedSukan,
-          subMatches: isBadmintonTeamFormat ? subMatches : []
+          subMatches: isTeamMatchFormat ? subMatches : []
         })
       });
       setTimeout(fetchData, 1200);
@@ -483,6 +499,7 @@ export default function App() {
 
   const canManageUndian = currentUser && (currentUser.role === 'MASTER' || currentUser.role === 'UNDIAN');
 
+  // Cabutan Rawak Satu Demi Satu (Kumpulan Dipisahkan Secara Bersih Mengikut Had Acara)
   const mulakanCabutan = () => {
     if (!canManageUndian) return alert("Hanya Urusetia Pengundian / Master Admin dibenarkan membuat undian.");
     if (!selectedSportUndian) return alert("Pilih sukan dahulu!");
@@ -494,19 +511,22 @@ export default function App() {
     }
 
     const currentSportDraws = tournamentDraws[selectedSportUndian] || {};
-    groupNames.forEach(g => { if (!currentSportDraws[g]) currentSportDraws[g] = []; });
-
+    
+    // Pastikan hanya ambil kumpulan yang sah
     const drawnTeams = [];
-    groupNames.forEach(g => drawnTeams.push(...currentSportDraws[g]));
+    groupNames.forEach(g => {
+      if (currentSportDraws[g]) drawnTeams.push(...currentSportDraws[g]);
+    });
+    
     const remainingTeams = teams.filter(t => !drawnTeams.includes(t));
 
     if (remainingTeams.length === 0) return alert(`Semua pasukan telah diundi bagi ${selectedSportUndian}!`);
 
     const maxPerGroup = Math.ceil(teams.length / groupCountUndian);
-    const availableGroups = groupNames.filter(g => currentSportDraws[g].length < maxPerGroup);
+    const availableGroups = groupNames.filter(g => (currentSportDraws[g] || []).length < maxPerGroup);
     if (availableGroups.length === 0) return alert("Semua kumpulan telah penuh!");
 
-    availableGroups.sort((a, b) => currentSportDraws[a].length - currentSportDraws[b].length);
+    availableGroups.sort((a, b) => ((currentSportDraws[a] || []).length) - ((currentSportDraws[b] || []).length));
     const targetGroup = availableGroups[0];
 
     setIsRolling(true);
@@ -521,16 +541,18 @@ export default function App() {
       setIsRolling(false);
       const chosen = remainingTeams[Math.floor(Math.random() * remainingTeams.length)];
       
-      const updatedSportDraws = { ...currentSportDraws, [targetGroup]: [...currentSportDraws[targetGroup], chosen] };
-      const updatedAll = { ...tournamentDraws, [selectedSportUndian]: updatedSportDraws };
-      
+      const cleanSportDraws = {};
+      groupNames.forEach(g => { cleanSportDraws[g] = [...(currentSportDraws[g] || [])]; });
+      cleanSportDraws[targetGroup].push(chosen);
+
+      const updatedAll = { ...tournamentDraws, [selectedSportUndian]: cleanSportDraws };
       setTournamentDraws(updatedAll);
       setDrawDisplay(`🎯 ${chosen}`);
       setDrawStatusLabel(`MASUK KE ${targetGroup.toUpperCase()}!`);
       
       const sportResults = [];
-      Object.keys(updatedSportDraws).forEach(grp => {
-        updatedSportDraws[grp].forEach(team => {
+      Object.keys(cleanSportDraws).forEach(grp => {
+        cleanSportDraws[grp].forEach(team => {
           sportResults.push({ sport: selectedSportUndian, group: grp, team: team });
         });
       });
@@ -542,6 +564,7 @@ export default function App() {
     }, 1800);
   };
 
+  // Undi Sukan Ini Terus (Sekaligus Bersih Tanpa Campur Kumpulan Lama)
   const undiSemuaSekaligus = async () => {
     if (!canManageUndian) return alert("Hanya Urusetia Pengundian / Master Admin dibenarkan membuat undian.");
     if (!selectedSportUndian) return alert("Pilih sukan dahulu!");
@@ -578,15 +601,20 @@ export default function App() {
     });
   };
 
-  const resetSemuaUndian = async () => {
+  const resetUndianSukanIni = async () => {
     if (!canManageUndian) return;
-    if (!window.confirm("Adakah anda pasti mahu memadam SEMUA keputusan undian bagi setiap sukan?")) return;
-    setTournamentDraws({});
+    if (!selectedSportUndian) return alert("Pilih sukan dahulu!");
+    if (!window.confirm(`Padam keputusan undian bagi sukan ${selectedSportUndian}?`)) return;
+
+    const copy = { ...tournamentDraws };
+    delete copy[selectedSportUndian];
+    setTournamentDraws(copy);
     setDrawDisplay("-- SEDIA --");
     setDrawStatusLabel("MENUNGGU CABUTAN BERMULA");
+
     await fetch(API_URL, {
       method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: "resetAllUndian" })
+      body: JSON.stringify({ action: "resetSingleSportUndian", sportName: selectedSportUndian })
     });
   };
 
@@ -662,7 +690,6 @@ export default function App() {
 
   const currentBolingList = getLeaderboardTableData();
 
-  // Pengiraan Pemenang Pingat
   const getMedalWinners = () => {
     if (isLeaderboardFormat) {
       const sorted = [...currentBolingList].filter(b => b.jumlahPin > 0);
@@ -684,7 +711,6 @@ export default function App() {
 
   const winners = getMedalWinners();
 
-  // Dapatkan Sub-Acara bagi perlawanan untuk paparan accordion
   const getSubListForStage = (peringkat) => {
     return jadualSubList.filter(s => s.sukan.toLowerCase() === selectedSukan.toLowerCase() && s.peringkat === peringkat);
   };
@@ -767,11 +793,11 @@ export default function App() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-blue-400 tracking-wide uppercase">
-                      {isLeaderboardFormat ? 'KEDUDUKAN MATA PASUKAN' : (isBadmintonTeamFormat ? '🏸 CARTA PERLAWANAN BERPASUKAN (BEST OF 5)' : '⚽ CARTA PERLAWANAN')}
+                      {isLeaderboardFormat ? 'KEDUDUKAN MATA PASUKAN' : (isTeamMatchFormat ? '🏆 CARTA PERLAWANAN BERPASUKAN' : '⚽ CARTA PERLAWANAN')}
                     </h2>
-                    {isBadmintonTeamFormat && (
+                    {isTeamMatchFormat && (
                       <p className="text-xs text-amber-300/90 font-medium mt-0.5">
-                        * Pemenang perlawanan ditentukan melalui kemenangan 3 daripada 5 kategori sub-acara.
+                        * Pemenang ditentukan melalui majoriti kemenangan kategori yang dipertandingkan.
                       </p>
                     )}
                   </div>
@@ -834,10 +860,10 @@ export default function App() {
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1">
                             <span>Separuh Akhir 1 (Kumpulan A)</span>
-                            {isBadmintonTeamFormat && (
+                            {isTeamMatchFormat && (
                               <button onClick={() => setExpandedTie(expandedTie === 'SF1' ? null : 'SF1')} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[11px]">
                                 {expandedTie === 'SF1' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                {expandedTie === 'SF1' ? 'Tutup Perincian' : 'Lihat 5 Acara'}
+                                {expandedTie === 'SF1' ? 'Tutup Perincian' : 'Lihat Kategori Acara'}
                               </button>
                             )}
                           </div>
@@ -854,8 +880,7 @@ export default function App() {
                             <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF1.skorB}</span>
                           </div>
 
-                          {/* Senarai 5 Acara Dropdown jika format berpasukan */}
-                          {isBadmintonTeamFormat && expandedTie === 'SF1' && (
+                          {isTeamMatchFormat && expandedTie === 'SF1' && (
                             <div className="mt-2 pt-2 border-t border-slate-800 space-y-1 bg-slate-950/60 p-2 rounded">
                               {getSubListForStage('Separuh Akhir 1').length > 0 ? getSubListForStage('Separuh Akhir 1').map((sub, i) => (
                                 <div key={i} className="flex justify-between items-center text-[11px] text-slate-300 border-b border-slate-900 pb-0.5 last:border-0">
@@ -863,7 +888,7 @@ export default function App() {
                                   <span className="font-bold text-yellow-400">{sub.pemenangSub ? `Pemenang: ${sub.pemenangSub}` : 'Belum selesai'}</span>
                                 </div>
                               )) : (
-                                <p className="text-[11px] text-slate-500 italic text-center">Keputusan 5 perlawanan belum dikemaskini oleh PIC.</p>
+                                <p className="text-[11px] text-slate-500 italic text-center">Keputusan kategori acara belum dikemaskini oleh PIC.</p>
                               )}
                             </div>
                           )}
@@ -873,10 +898,10 @@ export default function App() {
                         <div className="bg-slate-900/70 border border-slate-700/80 rounded-lg p-3 shadow-lg space-y-2">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1">
                             <span>Separuh Akhir 2 (Kumpulan B)</span>
-                            {isBadmintonTeamFormat && (
+                            {isTeamMatchFormat && (
                               <button onClick={() => setExpandedTie(expandedTie === 'SF2' ? null : 'SF2')} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[11px]">
                                 {expandedTie === 'SF2' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                {expandedTie === 'SF2' ? 'Tutup Perincian' : 'Lihat 5 Acara'}
+                                {expandedTie === 'SF2' ? 'Tutup Perincian' : 'Lihat Kategori Acara'}
                               </button>
                             )}
                           </div>
@@ -893,7 +918,7 @@ export default function App() {
                             <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewSF2.skorB}</span>
                           </div>
 
-                          {isBadmintonTeamFormat && expandedTie === 'SF2' && (
+                          {isTeamMatchFormat && expandedTie === 'SF2' && (
                             <div className="mt-2 pt-2 border-t border-slate-800 space-y-1 bg-slate-950/60 p-2 rounded">
                               {getSubListForStage('Separuh Akhir 2').length > 0 ? getSubListForStage('Separuh Akhir 2').map((sub, i) => (
                                 <div key={i} className="flex justify-between items-center text-[11px] text-slate-300 border-b border-slate-900 pb-0.5 last:border-0">
@@ -901,7 +926,7 @@ export default function App() {
                                   <span className="font-bold text-yellow-400">{sub.pemenangSub ? `Pemenang: ${sub.pemenangSub}` : 'Belum selesai'}</span>
                                 </div>
                               )) : (
-                                <p className="text-[11px] text-slate-500 italic text-center">Keputusan 5 perlawanan belum dikemaskini oleh PIC.</p>
+                                <p className="text-[11px] text-slate-500 italic text-center">Keputusan kategori acara belum dikemaskini oleh PIC.</p>
                               )}
                             </div>
                           )}
@@ -915,10 +940,10 @@ export default function App() {
                           <div className="bg-slate-900/70 border-2 border-yellow-500/50 rounded-lg p-3 shadow-xl space-y-2">
                             <div className="flex justify-between items-center text-xs font-bold text-yellow-500/80 border-b border-slate-800 pb-1">
                               <span>Perebutan Emas & Perak</span>
-                              {isBadmintonTeamFormat && (
+                              {isTeamMatchFormat && (
                                 <button onClick={() => setExpandedTie(expandedTie === 'AKH' ? null : 'AKH')} className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1 text-[11px]">
                                   {expandedTie === 'AKH' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                  {expandedTie === 'AKH' ? 'Tutup' : 'Lihat 5 Acara'}
+                                  {expandedTie === 'AKH' ? 'Tutup' : 'Lihat Kategori'}
                                 </button>
                               )}
                             </div>
@@ -935,7 +960,7 @@ export default function App() {
                               <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewAkhir.pasukanB ? viewAkhir.skorB : '-'}</span>
                             </div>
 
-                            {isBadmintonTeamFormat && expandedTie === 'AKH' && (
+                            {isTeamMatchFormat && expandedTie === 'AKH' && (
                               <div className="mt-2 pt-2 border-t border-slate-800 space-y-1 bg-slate-950/60 p-2 rounded">
                                 {getSubListForStage('Akhir').length > 0 ? getSubListForStage('Akhir').map((sub, i) => (
                                   <div key={i} className="flex justify-between items-center text-[11px] text-slate-300 border-b border-slate-900 pb-0.5 last:border-0">
@@ -943,7 +968,7 @@ export default function App() {
                                     <span className="font-bold text-yellow-400">{sub.pemenangSub ? `Pemenang: ${sub.pemenangSub}` : 'Belum selesai'}</span>
                                   </div>
                                 )) : (
-                                  <p className="text-[11px] text-slate-500 italic text-center">Keputusan 5 perlawanan belum dikemaskini oleh PIC.</p>
+                                  <p className="text-[11px] text-slate-500 italic text-center">Keputusan perlawanan belum dikemaskini oleh PIC.</p>
                                 )}
                               </div>
                             )}
@@ -955,10 +980,10 @@ export default function App() {
                           <div className="bg-slate-900/70 border-2 border-amber-600/40 rounded-lg p-3 shadow-lg space-y-2">
                             <div className="flex justify-between items-center text-xs font-bold text-amber-500/80 border-b border-slate-800 pb-1">
                               <span>Perebutan Gangsa</span>
-                              {isBadmintonTeamFormat && (
+                              {isTeamMatchFormat && (
                                 <button onClick={() => setExpandedTie(expandedTie === 'T3' ? null : 'T3')} className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-[11px]">
                                   {expandedTie === 'T3' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                  {expandedTie === 'T3' ? 'Tutup' : 'Lihat 5 Acara'}
+                                  {expandedTie === 'T3' ? 'Tutup' : 'Lihat Kategori'}
                                 </button>
                               )}
                             </div>
@@ -975,7 +1000,7 @@ export default function App() {
                               <span className="bg-slate-950/80 px-3 py-1 rounded font-bold text-amber-400">{viewT3.pasukanB ? viewT3.skorB : '-'}</span>
                             </div>
 
-                            {isBadmintonTeamFormat && expandedTie === 'T3' && (
+                            {isTeamMatchFormat && expandedTie === 'T3' && (
                               <div className="mt-2 pt-2 border-t border-slate-800 space-y-1 bg-slate-950/60 p-2 rounded">
                                 {getSubListForStage('Tempat Ke-3').length > 0 ? getSubListForStage('Tempat Ke-3').map((sub, i) => (
                                   <div key={i} className="flex justify-between items-center text-[11px] text-slate-300 border-b border-slate-900 pb-0.5 last:border-0">
@@ -983,7 +1008,7 @@ export default function App() {
                                     <span className="font-bold text-yellow-400">{sub.pemenangSub ? `Pemenang: ${sub.pemenangSub}` : 'Belum selesai'}</span>
                                   </div>
                                 )) : (
-                                  <p className="text-[11px] text-slate-500 italic text-center">Keputusan 5 perlawanan belum dikemaskini oleh PIC.</p>
+                                  <p className="text-[11px] text-slate-500 italic text-center">Keputusan perlawanan belum dikemaskini oleh PIC.</p>
                                 )}
                               </div>
                             )}
@@ -1127,8 +1152,8 @@ export default function App() {
                     {!canManageUndian ? "ℹ️ Mod Atlet: Hanya tontonan langsung. Log masuk Admin untuk membuat cabutan." : ""}
                   </span>
                   {canManageUndian && (
-                    <button onClick={resetSemuaUndian} className="text-xs text-rose-400 hover:text-rose-300 underline flex items-center gap-1">
-                      <RotateCcw className="w-3.5 h-3.5" /> Reset Semua Keputusan Undian
+                    <button onClick={resetUndianSukanIni} className="text-xs text-rose-400 hover:text-rose-300 underline flex items-center gap-1">
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Undian Sukan Ini ({selectedSportUndian})
                     </button>
                   )}
                 </div>
@@ -1146,7 +1171,13 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {acaraList.map((s, idx) => {
                     const spDraws = tournamentDraws[s.nama] || {};
-                    const groupKeys = Object.keys(spDraws);
+                    const validGroups = [];
+                    const count = Number(s.kumpulan) || 1;
+                    for (let g = 0; g < count; g++) {
+                      validGroups.push(count === 1 ? "Liga Kumpulan" : `Kumpulan ${String.fromCharCode(65 + g)}`);
+                    }
+
+                    const hasDraws = validGroups.some(grp => (spDraws[grp] || []).length > 0);
 
                     return (
                       <div key={idx} className="bg-slate-950/80 rounded-2xl p-4 shadow-xl border border-white/10">
@@ -1155,27 +1186,30 @@ export default function App() {
                           <span className="text-[10px] text-slate-300">{s.format}</span>
                         </div>
 
-                        {groupKeys.length === 0 ? (
+                        {!hasDraws ? (
                           <div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-900/50 rounded-lg text-center">
                             Belum dibuat undian
                           </div>
                         ) : (
-                          groupKeys.map((grpName, gIdx) => (
-                            <div key={gIdx} className="mb-3 last:mb-0">
-                              <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
-                                <span>{grpName}</span>
-                                <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{spDraws[grpName].length} Pasukan</span>
+                          validGroups.map((grpName, gIdx) => {
+                            const teamList = spDraws[grpName] || [];
+                            return (
+                              <div key={gIdx} className="mb-3 last:mb-0">
+                                <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center justify-between">
+                                  <span>{grpName}</span>
+                                  <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-300">{teamList.length} Pasukan</span>
+                                </div>
+                                <ul className="space-y-1">
+                                  {teamList.map((tm, tIdx) => (
+                                    <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white">
+                                      <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
+                                      <span>{tm}</span>
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
-                              <ul className="space-y-1">
-                                {spDraws[grpName].map((tm, tIdx) => (
-                                  <li key={tIdx} className="flex items-center gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-white">
-                                    <span className="w-4 text-center font-bold text-amber-400">{tIdx + 1}.</span>
-                                    <span>{tm}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     );
@@ -1239,8 +1273,8 @@ export default function App() {
                     <form onSubmit={handleAddAcara} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <input type="text" placeholder="Nama Sukan (cth: Badminton Berpasukan)" value={newAcara.nama} onChange={(e) => setNewAcara({...newAcara, nama: e.target.value})} required className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
                       <select value={newAcara.format} onChange={(e) => setNewAcara({...newAcara, format: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm text-amber-400 font-bold">
-                        <option value="Kalah Mati (Berpasukan 5 Acara)">Kalah Mati (Berpasukan 5 Acara)</option>
-                        <option value="Kalah Mati">Kalah Mati (Biasa)</option>
+                        <option value="Kalah Mati (Berpasukan)">Kalah Mati (Berpasukan)</option>
+                        <option value="Kalah Mati">Kalah Mati (Individu / Biasa)</option>
                         <option value="Boling">Boling / Mata Pasukan</option>
                       </select>
                       <input type="number" placeholder="Bil Kumpulan" value={newAcara.kumpulan} onChange={(e) => setNewAcara({...newAcara, kumpulan: e.target.value})} className="p-3 bg-slate-950/80 border border-slate-700/80 rounded-lg text-sm" />
@@ -1314,38 +1348,61 @@ export default function App() {
                               </select>
                             </div>
 
-                            {/* JIKA FORMAT BERPASUKAN 5 ACARA (BADMINTON) */}
-                            {isBadmintonTeamFormat ? (
+                            {/* FORMAT BERPASUKAN: ADMIN BEBAS TAMBAH / PADAM KATEGORI ACARA */}
+                            {isTeamMatchFormat ? (
                               <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                                   <span className="text-xs font-bold text-yellow-400 uppercase">
-                                    5 Perlawanan Kategori: {newJadual.pasukanA || 'A'} vs {newJadual.pasukanB || 'B'}
+                                    Kategori Perlawanan: {newJadual.pasukanA || 'A'} vs {newJadual.pasukanB || 'B'}
                                   </span>
                                   <span className="text-xs font-bold text-emerald-400">
                                     Mata Semasa: {newJadual.skorA} - {newJadual.skorB}
                                   </span>
                                 </div>
 
-                                {subMatches.map((item, idx) => (
-                                  <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-2 bg-slate-900/80 rounded-lg text-xs">
-                                    <span className="font-semibold text-slate-200">{item.kategori}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[11px] text-slate-400">Pemenang:</span>
-                                      <select 
-                                        value={item.pemenangSub} 
-                                        onChange={(e) => handleSubWinnerSelect(idx, e.target.value)}
-                                        className="p-1.5 bg-slate-950 border border-slate-700 rounded text-amber-400 font-bold text-xs"
-                                      >
-                                        <option value="">-- Pilih Pemenang --</option>
-                                        <option value={newJadual.pasukanA}>{newJadual.pasukanA}</option>
-                                        <option value={newJadual.pasukanB}>{newJadual.pasukanB}</option>
-                                      </select>
+                                {/* Form Tambah Kategori Acara Sendiri oleh Admin */}
+                                <div className="flex gap-2 pt-1">
+                                  <input 
+                                    type="text" 
+                                    placeholder="Tambah nama kategori (cth: Beregu Campuran / Single Lelaki)"
+                                    value={customCategoryInput}
+                                    onChange={(e) => setCustomCategoryInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomCategory(); }}}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                                  />
+                                  <button type="button" onClick={handleAddCustomCategory} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap">
+                                    + Tambah Kategori
+                                  </button>
+                                </div>
+
+                                {/* Senarai Kategori Perlawanan */}
+                                <div className="space-y-2 pt-2">
+                                  {subMatches.map((item, idx) => (
+                                    <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-2.5 bg-slate-900/80 rounded-lg text-xs border border-slate-800">
+                                      <div className="flex items-center gap-2">
+                                        <button type="button" onClick={() => handleRemoveCustomCategory(idx)} className="text-rose-400 hover:text-rose-300" title="Padam Kategori Ini">
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                        <span className="font-semibold text-slate-200">{item.kategori}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-slate-400">Pemenang:</span>
+                                        <select 
+                                          value={item.pemenangSub} 
+                                          onChange={(e) => handleSubWinnerSelect(idx, e.target.value)}
+                                          className="p-1.5 bg-slate-950 border border-slate-700 rounded text-amber-400 font-bold text-xs"
+                                        >
+                                          <option value="">-- Pilih Pemenang --</option>
+                                          <option value={newJadual.pasukanA}>{newJadual.pasukanA}</option>
+                                          <option value={newJadual.pasukanB}>{newJadual.pasukanB}</option>
+                                        </select>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
 
                                 <div className="p-3 bg-slate-900 border border-emerald-500/50 rounded-lg text-emerald-400 font-bold text-center text-sm">
-                                  Pemenang Keseluruhan Tie: {newJadual.pemenang || 'Belum Ditentukan (Perlu Majoriti)'}
+                                  Pemenang Keseluruhan Perlawanan: {newJadual.pemenang || 'Belum Ditentukan (Perlu Majoriti)'}
                                 </div>
                               </div>
                             ) : (
@@ -1362,7 +1419,7 @@ export default function App() {
                               </div>
                             )}
 
-                            {!isBadmintonTeamFormat && (
+                            {!isTeamMatchFormat && (
                               <div className="p-3 bg-slate-950 border border-emerald-500/50 rounded-lg text-emerald-400 font-bold text-center text-sm">
                                 Pemenang: {newJadual.pemenang || '-'}
                               </div>
